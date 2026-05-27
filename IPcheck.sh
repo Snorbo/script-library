@@ -1,8 +1,9 @@
 #!/bin/bash
-#变量
+# 变量
 CURRENT_SCRIPT_PATH=$(readlink -f "$0")
 DEFAULT_ARG="-4"
 RAW_SCRIPT=$(curl -Ls https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/ip_clear.sh)
+
 # 自动检测并配置快捷键 'z'
 ## 检测当前 Shell 配置文件
 if [ -n "$ZSH_VERSION" ]; then
@@ -48,5 +49,11 @@ fi
 
 echo -e "\n[正在拉取脚本]... 请稍候...\n"
 
-# 执行远程脚本并传递参数
-bash <(echo "$RAW_SCRIPT") $FINAL_ARG
+# 【优化核心】：判断网络请求是否成功，避免空变量引发错误
+if [ -z "$RAW_SCRIPT" ]; then
+    echo "错误：无法从 GitHub 拉取脚本，请检查网络连接！"
+    exit 1
+fi
+
+# 【优化核心】：使用管道配合 -s 传参，完美避开路径解析 Bug
+echo "$RAW_SCRIPT" | bash -s -- $FINAL_ARG
