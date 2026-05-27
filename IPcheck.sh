@@ -1,17 +1,17 @@
 #!/bin/bash
-
-
-# 自动检测并配置快捷键 'z'
+#变量
 CURRENT_SCRIPT_PATH=$(readlink -f "$0")
-
-# 检测当前 Shell 配置文件
+DEFAULT_ARG="-4"
+RAW_SCRIPT=$(curl -Ls https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/ip_clear.sh)
+# 自动检测并配置快捷键 'z'
+## 检测当前 Shell 配置文件
 if [ -n "$ZSH_VERSION" ]; then
     CONF_FILE="$HOME/.zshrc"
 else
     CONF_FILE="$HOME/.bashrc"
 fi
 
-# 检查是否已经配置过别名
+## 检查是否已经配置过别名
 if ! grep -q "alias z=" "$CONF_FILE"; then
     echo "提示: 检测到首次运行，正在为你配置快捷键 'z'..."
     echo "alias z='$CURRENT_SCRIPT_PATH'" >> "$CONF_FILE"
@@ -21,10 +21,6 @@ if ! grep -q "alias z=" "$CONF_FILE"; then
     echo "=================================================="
     echo ""
 fi
-
-# 默认参数
-DEFAULT_ARG="-4"
-RAW_SCRIPT=$(curl -Ls https://raw.githubusercontent.com/xykt/IPQuality/refs/heads/main/ip.sh)
 
 echo "=================================================="
 echo "          IP Check 快捷运行脚本"
