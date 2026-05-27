@@ -1,13 +1,37 @@
 #!/bin/bash
 
+
+# 自动检测并配置快捷键 'z'
+CURRENT_SCRIPT_PATH=$(readlink -f "$0")
+
+# 检测当前 Shell 配置文件
+if [ -n "$ZSH_VERSION" ]; then
+    CONF_FILE="$HOME/.zshrc"
+else
+    CONF_FILE="$HOME/.bashrc"
+fi
+
+# 检查是否已经配置过别名
+if ! grep -q "alias z=" "$CONF_FILE"; then
+    echo "提示: 检测到首次运行，正在为你配置快捷键 'z'..."
+    echo "alias z='$CURRENT_SCRIPT_PATH'" >> "$CONF_FILE"
+    echo "--------------------------------------------------"
+    echo "配置成功！由于系统限制，当前窗口需要手动输入: source $CONF_FILE"
+    echo "或者直接重新打开一个终端窗口，之后就可以随时使用快捷键 [ z ] 了！"
+    echo "=================================================="
+    echo ""
+fi
+
 # 默认参数
 DEFAULT_ARG="-4"
 
 echo "=================================================="
 echo "          IP Check 快捷运行脚本"
 echo "=================================================="
-echo "提示: 直接回车将默认使用参数: $DEFAULT_ARG"
-echo "你可以输入其他参数 (例如: -6, -all, --help 等)"
+echo "提示: 直接回车将默认使用参数: $DEFAULT_ARG(仅检查IPV4的IP质量)"
+echo "其他参数备注："
+echo "-6：仅检查IPV6的IP质量 |-y：自动安装依赖"
+echo "-f：展示完整IP地址     |-p：禁用在线报告生成"
 echo "--------------------------------------------------"
 
 # 读取用户输入
