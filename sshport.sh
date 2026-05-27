@@ -7,7 +7,7 @@ gl_huang='\033[33m'
 gl_bai='\033[0m'
 gl_kjlan='\033[96m'
 
-# 通用安装函数（精简版，仅支持主流包管理器）
+# 通用安装函数（精简版）
 install() {
     for package in "$@"; do
         if ! command -v "$package" &>/dev/null; then
@@ -52,10 +52,9 @@ restart_ssh() {
     restart sshd > /dev/null 2>&1
 }
 
-# 修正 SSH 配置（确保基本登录方式正确）
+# 修正 SSH 配置
 correct_ssh_config() {
     local sshd_config="/etc/ssh/sshd_config"
-    # 防止因为某些配置导致无法登录，设置合理的默认值
     if grep -Eq "^\s*PasswordAuthentication\s+no" "$sshd_config"; then
         sed -i -e 's/^\s*#\?\s*PermitRootLogin .*/PermitRootLogin prohibit-password/' \
                -e 's/^\s*#\?\s*PasswordAuthentication .*/PasswordAuthentication no/' \
@@ -69,38 +68,45 @@ correct_ssh_config() {
     rm -rf /etc/ssh/sshd_config.d/* /etc/ssh/ssh_config.d/* 2>/dev/null
 }
 
-# 保存 iptables 规则（持久化）
-save_iptables_rules() {
-    install iptables iptables-persistent 2>/dev/null
-    mkdir -p /etc/iptables
-    iptables-save > /etc/iptables/rules.v4
-    # 设置开机自动恢复
-    if ! grep -q "iptables-restore" /etc/rc.local 2>/dev/null; then
-        echo "iptables-restore < /etc/iptables/rules.v4" >> /etc/rc.local
-        chmod +x /etc/rc.local
-    fi
-}
-
-# 开放指定端口
-open_port() {
-    local ports=($@)
-    if [ ${#ports[@]} -eq 0 ]; then
-        echo "请提供至少一个端口号"
-        return 1
-    fi
-    install iptables
-    for port in "${ports[@]}"; do
+# 智能防火墙端口放行
+allow_port_firewall() {
+    local port=$1
+    # 1. 检查 iptables 是否存在且可用
+    if command -v iptables >/dev/null 2>&1; then
+        echo -e "${gl_kjlan}检测到 iptables，使用 iptables 放行端口 ${port}${gl_bai}"
+        # 删除可能存在的 DROP 规则
         iptables -D INPUT -p tcp --dport $port -j DROP 2>/dev/null
         iptables -D INPUT -p udp --dport $port -j DROP 2>/dev/null
+        # 添加 ACCEPT 规则（如果尚未存在）
         if ! iptables -C INPUT -p tcp --dport $port -j ACCEPT 2>/dev/null; then
             iptables -I INPUT 1 -p tcp --dport $port -j ACCEPT
         fi
         if ! iptables -C INPUT -p udp --dport $port -j ACCEPT 2>/dev/null; then
             iptables -I INPUT 1 -p udp --dport $port -j ACCEPT
-            echo -e "${gl_lv}已打开端口 $port${gl_bai}"
         fi
-    done
-    save_iptables_rules
+        # 持久化 iptables 规则
+        mkdir -p /etc/iptables
+        iptables-save > /etc/iptables/rules.v4
+        if ! grep -q "iptables-restore" /etc/rc.local 2>/dev/null; then
+            echo "iptables-restore < /etc/iptables/rules.v4" >> /etc/rc.local
+            chmod +x /etc/rc.local
+        fi
+        echo -e "${gl_lv}已使用 iptables 放行端口 ${port}${gl_bai}"
+        return 0
+    fi
+
+    # 2. 检查 ufw 是否存在且可用
+    if command -v ufw >/dev/null 2>&1; then
+        echo -e "${gl_kjlan}检测到 ufw，使用 ufw 放行端口 ${port}${gl_bai}"
+        ufw allow ${port}/tcp comment 'SSH new port'
+        ufw reload
+        echo -e "${gl_lv}已使用 ufw 放行端口 ${port}${gl_bai}"
+        return 0
+    fi
+
+    # 3. 都没有，则跳过防火墙配置
+    echo -e "${gl_huang}未检测到 iptables 或 ufw，已跳过防火墙放行步骤。请手动确保端口 ${port} 已开放。${gl_bai}"
+    return 0
 }
 
 # 修改 SSH 端口主函数
@@ -119,27 +125,23 @@ new_ssh_port() {
     correct_ssh_config
     # 重启 SSH 服务
     restart_ssh
-    # 放行新端口（防火墙）
-    open_port $new_port
-    # 可选：关闭旧的 SSH 端口（原配置中的端口号，需要用户提前告知，这里省略）
+    # 智能放行新端口
+    allow_port_firewall "$new_port"
     echo -e "${gl_lv}SSH 端口已修改为: $new_port${gl_bai}"
     echo -e "${gl_huang}请确保新端口 $new_port 已放行，并保持当前连接，测试新端口可用后再关闭旧会话。${gl_bai}"
 }
 
-# 主程序：交互式输入端口号或直接传参
+# 主程序
 if [ "$EUID" -ne 0 ]; then
     echo -e "${gl_hong}请使用 root 权限运行此脚本（例如：sudo $0）${gl_bai}"
     exit 1
 fi
 
 if [ $# -eq 1 ]; then
-    # 通过参数传入端口号
     PORT="$1"
 else
-    # 交互式输入
     echo -e "${gl_kjlan}修改 SSH 连接端口${gl_bai}"
     echo "------------------------"
-    # 读取当前端口（如果配置了多个 Port，只显示第一个）
     CURRENT_PORT=$(grep -E '^ *Port [0-9]+' /etc/ssh/sshd_config | awk '{print $2}')
     if [ -n "$CURRENT_PORT" ]; then
         echo -e "当前 SSH 端口号: ${gl_huang}$CURRENT_PORT${gl_bai}"
@@ -165,5 +167,4 @@ else
     done
 fi
 
-# 执行修改
 new_ssh_port "$PORT"
