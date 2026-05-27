@@ -24,6 +24,7 @@ fi
 
 # 默认参数
 DEFAULT_ARG="-4"
+RAW_SCRIPT=$(curl -Ls https://raw.githubusercontent.com/xykt/IPQuality/refs/heads/main/ip.sh)
 
 echo "=================================================="
 echo "          IP Check 快捷运行脚本"
@@ -49,7 +50,7 @@ else
     fi
 fi
 
-echo -e "\n[正在执行]: bash <(curl -Ls https://IP.Check.Place) $FINAL_ARG\n"
+echo -e "\n[正在拉取脚本]... 请稍候...\n"
 
 # 执行远程脚本并传递参数
-bash <(curl -Ls https://IP.Check.Place) $FINAL_ARG
+bash <(echo "$RAW_SCRIPT") $FINAL_ARG
