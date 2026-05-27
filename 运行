@@ -1,5 +1,7 @@
 #IP检测脚本（绑定z快捷键）
-
 wget https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/IPcheck.sh
 chmod +x IPcheck.sh
 ./IPcheck.sh
+
+#重置密码
+passwd
