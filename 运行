@@ -1,0 +1,3 @@
+#IP检测脚本（绑定z快捷键）
+
+wget -qO- https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/IPcheck.sh | bash
