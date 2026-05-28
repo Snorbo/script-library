@@ -2,6 +2,9 @@
 wget https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/IPcheck.sh
 chmod +x IPcheck.sh
 ./IPcheck.sh
-
+#UFW配置脚本
+wget https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/ufw.sh
+chmod +x ufw.sh
+./ufw.sh
 #重置密码
 passwd
