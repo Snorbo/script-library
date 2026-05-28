@@ -8,3 +8,20 @@ chmod +x ufw.sh
 ./ufw.sh
 #重置密码
 passwd
+#禁止IPQS
+nano /etc/hosts
+
+127.0.0.1 ipqualityscore.com
+127.0.0.1 www.ipqualityscore.com
+127.0.0.1 api.ipqualityscore.com
+
+#解除53端口占用
+sudo nano /etc/systemd/resolved.conf
+#增加：
+DNS=8.8.8.8 1.1.1.1
+DNSStubListener=no
+#创建软链接替换 resolv.conf
+sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+sudo systemctl restart systemd-resolved
+#验证
+sudo lsof -i :53
