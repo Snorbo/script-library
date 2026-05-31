@@ -8,6 +8,10 @@ chmod +x ufw.sh
 ./ufw.sh
 #重置密码
 passwd
+#禁止ICMP(IPV4)
+sudo nano /etc/sysctl.conf
+net.ipv4.icmp_echo_ignore_all = 1
+sudo sysctl -p
 #禁止IPQS
 nano /etc/hosts
 
