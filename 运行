@@ -29,3 +29,5 @@ sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 sudo systemctl restart systemd-resolved
 #验证
 sudo lsof -i :53
+
+3x-ui写geosite:category-ai-chat-!cn分流非中国地区的AI域名
