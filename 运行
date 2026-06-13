@@ -31,3 +31,6 @@ sudo systemctl restart systemd-resolved
 sudo lsof -i :53
 
 3x-ui写geosite:category-ai-chat-!cn分流非中国地区的AI域名
+
+#nodequality
+bash <(curl -sL https://run.NodeQuality.com)
