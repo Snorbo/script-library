@@ -34,3 +34,6 @@ sudo lsof -i :53
 
 #nodequality
 bash <(curl -sL https://run.NodeQuality.com)
+
+#解锁查询脚本 
+bash <(curl -L -s https://github.com/1-stream/RegionRestrictionCheck/raw/main/check.sh)
