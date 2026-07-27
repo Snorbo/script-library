@@ -19,6 +19,7 @@ nano /etc/hosts
 127.0.0.1 www.ipqualityscore.com
 127.0.0.1 api.ipqualityscore.com
 
+sudo sed -i '/ipqualityscore.com/d' /etc/hosts && sudo sh -c 'echo "127.0.0.1 ipqualityscore.com\n127.0.0.1 www.ipqualityscore.com\n127.0.0.1 api.ipqualityscore.com" >> /etc/hosts'
 #解除53端口占用
 sudo nano /etc/systemd/resolved.conf
 #增加：
@@ -29,7 +30,8 @@ sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 sudo systemctl restart systemd-resolved
 #验证
 sudo lsof -i :53
-
+#针对清洁系统的一键脚本
+sudo bash -c 'echo -e "[Resolve]\nDNS=8.8.8.8 1.1.1.1\nDNSStubListener=no" > /etc/systemd/resolved.conf && ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf && systemctl restart systemd-resolved'
 3x-ui写geosite:category-ai-chat-!cn分流非中国地区的AI域名
 
 #nodequality
