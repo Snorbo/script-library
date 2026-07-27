@@ -37,9 +37,10 @@ show_menu() {
     echo "12. Ubuntu系统升级（24升级26）"
     echo "13. 安装Adguardhome"
     echo "14. 查看系统信息"
+    echo "15. 系统清理"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
-    echo -n "请输入选项 [0-14]: "
+    echo -n "请输入选项 [0-15]: "
 }
 
 # 1. 修改 SSH 端口
@@ -228,6 +229,14 @@ option14() {
     echo -e "${GREEN}完成。${NC}"
     read -p "按回车键继续..."
 }
+
+# 15. 系统清理
+option15() {
+    echo -e "${YELLOW}执行：拉取清理脚本...${NC}"
+    bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/sysclean.sh)
+    echo -e "${GREEN}完成。${NC}"
+    read -p "按回车键继续..."
+}
 # 主循环
 while true; do
     show_menu
@@ -247,6 +256,7 @@ while true; do
         12) option12 ;;
         13) option13 ;;
         14) option14 ;;
+        15) option15 ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
     esac
