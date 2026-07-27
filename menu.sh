@@ -201,8 +201,8 @@ option11() {
 # 12. Ubuntu系统升级
 option12() {
     echo -e "${YELLOW}====== 系统升级 ======${NC}"
-    echo -e "${BLUE}→ 执行 sudo do-release-upgrade -d ...${NC}"
-    sudo do-release-upgrade -d
+    echo -e "${BLUE}→ 执行 sudo do-release-upgrade ...${NC}"
+    sudo do-release-upgrade
     echo -e "${GREEN}系统升级完成。${NC}"
     read -p "按回车键继续..."
 }
