@@ -223,7 +223,7 @@ option13() {
 
 # 14. 查看系统信息
 option14() {
-    echo -e "${YELLOW}执行：修改 SSH 连接端口...${NC}"
+    echo -e "${YELLOW}执行：拉取信息获取脚本...${NC}"
     bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/sysinfo.sh)
     echo -e "${GREEN}完成。${NC}"
     read -p "按回车键继续..."
