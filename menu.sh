@@ -178,6 +178,8 @@ EOF
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}证书申请成功！证书位置：/etc/letsencrypt/live/${wildcard_domain}/${NC}"
+        echo -e "${GREEN}子命令certificates显示所有证书的信息；revoke吊销证书；delete删除证书${NC}"
+        echo -e "${GREEN}示例：sudo certbot certificates ${NC}"
     else
         echo -e "${RED}证书申请失败，请检查域名、API 凭证及网络。${NC}"
     fi
