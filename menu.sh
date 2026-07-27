@@ -32,6 +32,7 @@ show_menu() {
     echo "7. 安装 nexttrace"
     echo "8. 安装支持 BBR 的内核（带参数 1）"
     echo "9. 安装 3x-ui 面板"
+    echo "10. 配置通配符证书（Certbot + Cloudflare DNS）"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
     echo -n "请输入选项 [0-9]: "
@@ -113,6 +114,74 @@ option9() {
     read -p "按回车键继续..."
 }
 
+# 10. 配置通配符证书（Certbot + Cloudflare DNS）
+option10() {
+    echo -e "${YELLOW}====== 配置通配符证书（Certbot + Cloudflare DNS） ======${NC}"
+    
+    # 1. 移除旧版 certbot（如有）
+    echo -e "${BLUE}→ 移除旧版 certbot...${NC}"
+    sudo apt-get remove -y certbot 2>/dev/null || true
+
+    # 2. 通过 snap 安装 certbot
+    echo -e "${BLUE}→ 安装 certbot（snap）...${NC}"
+    sudo snap install certbot --classic
+
+    # 3. 创建软链接
+    echo -e "${BLUE}→ 创建 /usr/bin/certbot 软链接...${NC}"
+    sudo ln -sf /snap/bin/certbot /usr/bin/certbot
+
+    # 4. 允许 snap 插件以 root 运行
+    echo -e "${BLUE}→ 设置 trust-plugin-with-root...${NC}"
+    sudo snap set certbot trust-plugin-with-root=ok
+
+    # 5. 安装 Cloudflare DNS 插件
+    echo -e "${BLUE}→ 安装 certbot-dns-cloudflare 插件...${NC}"
+    sudo snap install certbot-dns-cloudflare
+
+    # 6. 创建 Cloudflare 凭证文件（由用户输入 API Key）
+    echo -e "${BLUE}→ 请输入你的 Cloudflare API Key（输入时不显示，请直接粘贴后回车）：${NC}"
+    read -s api_key
+    if [ -z "$api_key" ]; then
+        echo -e "${RED}API Key 不能为空，取消操作。${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+    echo -e "${BLUE}→ 创建 /etc/letsencrypt/cloudflare.int 并设置权限...${NC}"
+    sudo mkdir -p /etc/letsencrypt
+    # 注意：邮箱固定为 email.snorbo@gmail.com，若需修改可自行调整
+    sudo tee /etc/letsencrypt/cloudflare.int > /dev/null <<EOF
+# Cloudflare API credentials used by Certbot
+dns_cloudflare_email = email.snorbo@gmail.com
+dns_cloudflare_api_key = ${api_key}
+EOF
+    sudo chmod 0400 /etc/letsencrypt/cloudflare.int
+
+    # 7. 询问通配符域名
+    echo -e "${BLUE}→ 请输入你要申请的通配符域名（例如 *.example.com）：${NC}"
+    read -p "域名: " wildcard_domain
+    if [ -z "$wildcard_domain" ]; then
+        echo -e "${RED}域名不能为空，取消操作。${NC}"
+        read -p "按回车键继续..."
+        return
+    fi
+
+    # 8. 执行 certbot 申请证书
+    echo -e "${BLUE}→ 开始申请证书，请稍候...${NC}"
+    sudo certbot certonly \
+        --dns-cloudflare \
+        --dns-cloudflare-credentials /etc/letsencrypt/cloudflare.int \
+        --dns-cloudflare-propagation-seconds 60 \
+        --key-type ecdsa \
+        -d "$wildcard_domain"
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}证书申请成功！证书位置：/etc/letsencrypt/live/${wildcard_domain}/${NC}"
+    else
+        echo -e "${RED}证书申请失败，请检查域名、API 凭证及网络。${NC}"
+    fi
+
+    read -p "按回车键继续..."
+}
 # 主循环
 while true; do
     show_menu
@@ -127,6 +196,7 @@ while true; do
         7) option7 ;;
         8) option8 ;;
         9) option9 ;;
+        10) option10 ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
     esac
