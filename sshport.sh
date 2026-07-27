@@ -1,170 +1,90 @@
 #!/bin/bash
+# 更换SSH端口脚本（基于科技lion脚本提取）
+# 使用方法：以root身份运行，按提示输入新端口号
+
+set -e
 
 # 颜色定义
-gl_hong='\033[31m'
-gl_lv='\033[32m'
-gl_huang='\033[33m'
-gl_bai='\033[0m'
-gl_kjlan='\033[96m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+NC='\033[0m'
 
-# 通用安装函数（精简版）
-install() {
-    for package in "$@"; do
-        if ! command -v "$package" &>/dev/null; then
-            echo -e "${gl_kjlan}正在安装 $package...${gl_bai}"
-            if command -v dnf &>/dev/null; then
-                dnf install -y "$package"
-            elif command -v yum &>/dev/null; then
-                yum install -y "$package"
-            elif command -v apt &>/dev/null; then
-                apt update -y && apt install -y "$package"
-            elif command -v apk &>/dev/null; then
-                apk add "$package"
-            elif command -v pacman &>/dev/null; then
-                pacman -S --noconfirm "$package"
-            elif command -v zypper &>/dev/null; then
-                zypper install -y "$package"
-            else
-                echo "未知的包管理器，无法安装 $package"
-                return 1
-            fi
-        fi
-    done
-}
-
-# 通用重启函数
-restart() {
-    local SERVICE_NAME="$1"
-    if command -v apk &>/dev/null; then
-        service "$SERVICE_NAME" restart
-    else
-        systemctl restart "$SERVICE_NAME"
-    fi
-    if [ $? -eq 0 ]; then
-        echo "$SERVICE_NAME 服务已重启。"
-    else
-        echo "错误：重启 $SERVICE_NAME 服务失败。"
-    fi
-}
-
-# 重启 SSH 服务
-restart_ssh() {
-    restart sshd > /dev/null 2>&1
-}
-
-# 修正 SSH 配置
-correct_ssh_config() {
-    local sshd_config="/etc/ssh/sshd_config"
-    if grep -Eq "^\s*PasswordAuthentication\s+no" "$sshd_config"; then
-        sed -i -e 's/^\s*#\?\s*PermitRootLogin .*/PermitRootLogin prohibit-password/' \
-               -e 's/^\s*#\?\s*PasswordAuthentication .*/PasswordAuthentication no/' \
-               -e 's/^\s*#\?\s*PubkeyAuthentication .*/PubkeyAuthentication yes/' \
-               -e 's/^\s*#\?\s*ChallengeResponseAuthentication .*/ChallengeResponseAuthentication no/' "$sshd_config"
-    else
-        sed -i -e 's/^\s*#\?\s*PermitRootLogin .*/PermitRootLogin yes/' \
-               -e 's/^\s*#\?\s*PasswordAuthentication .*/PasswordAuthentication yes/' \
-               -e 's/^\s*#\?\s*PubkeyAuthentication .*/PubkeyAuthentication yes/' "$sshd_config"
-    fi
-    rm -rf /etc/ssh/sshd_config.d/* /etc/ssh/ssh_config.d/* 2>/dev/null
-}
-
-# 智能防火墙端口放行
-allow_port_firewall() {
-    local port=$1
-    # 1. 检查 iptables 是否存在且可用
-    if command -v iptables >/dev/null 2>&1; then
-        echo -e "${gl_kjlan}检测到 iptables，使用 iptables 放行端口 ${port}${gl_bai}"
-        # 删除可能存在的 DROP 规则
-        iptables -D INPUT -p tcp --dport $port -j DROP 2>/dev/null
-        iptables -D INPUT -p udp --dport $port -j DROP 2>/dev/null
-        # 添加 ACCEPT 规则（如果尚未存在）
-        if ! iptables -C INPUT -p tcp --dport $port -j ACCEPT 2>/dev/null; then
-            iptables -I INPUT 1 -p tcp --dport $port -j ACCEPT
-        fi
-        if ! iptables -C INPUT -p udp --dport $port -j ACCEPT 2>/dev/null; then
-            iptables -I INPUT 1 -p udp --dport $port -j ACCEPT
-        fi
-        # 持久化 iptables 规则
-        mkdir -p /etc/iptables
-        iptables-save > /etc/iptables/rules.v4
-        if ! grep -q "iptables-restore" /etc/rc.local 2>/dev/null; then
-            echo "iptables-restore < /etc/iptables/rules.v4" >> /etc/rc.local
-            chmod +x /etc/rc.local
-        fi
-        echo -e "${gl_lv}已使用 iptables 放行端口 ${port}${gl_bai}"
-        return 0
-    fi
-
-    # 2. 检查 ufw 是否存在且可用
-    if command -v ufw >/dev/null 2>&1; then
-        echo -e "${gl_kjlan}检测到 ufw，使用 ufw 放行端口 ${port}${gl_bai}"
-        ufw allow ${port}/tcp comment 'SSH new port'
-        ufw reload
-        echo -e "${gl_lv}已使用 ufw 放行端口 ${port}${gl_bai}"
-        return 0
-    fi
-
-    # 3. 都没有，则跳过防火墙配置
-    echo -e "${gl_huang}未检测到 iptables 或 ufw，已跳过防火墙放行步骤。请手动确保端口 ${port} 已开放。${gl_bai}"
-    return 0
-}
-
-# 修改 SSH 端口主函数
-new_ssh_port() {
-    local new_port=$1
-    if [[ -z "$new_port" ]]; then
-        echo "用法：$0 <新端口号>"
-        exit 1
-    fi
-    # 备份原配置
-    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
-    # 删除已有 Port 行，添加新端口
-    sed -i '/^\s*#\?\s*Port\s\+/d' /etc/ssh/sshd_config
-    echo "Port $new_port" >> /etc/ssh/sshd_config
-    # 确保其他基本配置正确
-    correct_ssh_config
-    # 重启 SSH 服务
-    restart_ssh
-    # 智能放行新端口
-    allow_port_firewall "$new_port"
-    echo -e "${gl_lv}SSH 端口已修改为: $new_port${gl_bai}"
-    echo -e "${gl_huang}请确保新端口 $new_port 已放行，并保持当前连接，测试新端口可用后再关闭旧会话。${gl_bai}"
-}
-
-# 主程序
+# 检查root权限
 if [ "$EUID" -ne 0 ]; then
-    echo -e "${gl_hong}请使用 root 权限运行此脚本（例如：sudo $0）${gl_bai}"
-    exit 1
+  echo -e "${RED}错误：请以 root 用户运行此脚本${NC}"
+  exit 1
 fi
 
-if [ $# -eq 1 ]; then
-    PORT="$1"
-else
-    echo -e "${gl_kjlan}修改 SSH 连接端口${gl_bai}"
-    echo "------------------------"
-    CURRENT_PORT=$(grep -E '^ *Port [0-9]+' /etc/ssh/sshd_config | awk '{print $2}')
-    if [ -n "$CURRENT_PORT" ]; then
-        echo -e "当前 SSH 端口号: ${gl_huang}$CURRENT_PORT${gl_bai}"
-    else
-        echo -e "当前 SSH 端口号: ${gl_huang}22（默认）${gl_bai}"
+# 获取当前SSH端口（若未设置则默认22）
+current_port=$(grep -E '^[[:space:]]*Port[[:space:]]+[0-9]+' /etc/ssh/sshd_config | awk '{print $2}')
+if [ -z "$current_port" ]; then
+  current_port=22
+fi
+echo -e "当前SSH端口号：${YELLOW}${current_port}${NC}"
+
+# 输入新端口
+while true; do
+  read -p "请输入新的SSH端口号（1-65535，输入0退出）: " new_port
+  if [[ "$new_port" =~ ^[0-9]+$ ]]; then
+    if [ "$new_port" -eq 0 ]; then
+      echo "已取消操作。"
+      exit 0
+    elif [ "$new_port" -ge 1 ] && [ "$new_port" -le 65535 ]; then
+      break
     fi
-    echo "------------------------"
-    echo "端口号范围 1-65535（输入 0 退出）"
-    while true; do
-        read -e -p "请输入新的 SSH 端口号: " PORT
-        if [[ "$PORT" =~ ^[0-9]+$ ]]; then
-            if [ "$PORT" -eq 0 ]; then
-                echo "已取消修改。"
-                exit 0
-            elif [ "$PORT" -ge 1 ] && [ "$PORT" -le 65535 ]; then
-                break
-            else
-                echo -e "${gl_hong}端口号无效，请输入 1-65535 之间的数字。${gl_bai}"
-            fi
-        else
-            echo -e "${gl_hong}输入无效，请输入数字。${gl_bai}"
-        fi
-    done
+  fi
+  echo -e "${RED}无效端口，请输入1-65535之间的数字。${NC}"
+done
+
+# 备份配置文件
+cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+echo "已备份配置文件到 /etc/ssh/sshd_config.bak"
+
+# 修改端口（删除原有Port行，在文件首行插入新Port）
+sed -i '/^[[:space:]]*#\?[[:space:]]*Port[[:space:]]\+/d' /etc/ssh/sshd_config
+sed -i "1i Port $new_port" /etc/ssh/sshd_config
+
+# 重启SSH服务
+echo "正在重启SSH服务..."
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl restart sshd || systemctl restart ssh
+elif command -v service >/dev/null 2>&1; then
+  service sshd restart || service ssh restart
+else
+  /etc/init.d/sshd restart || /etc/init.d/ssh restart
 fi
 
-new_ssh_port "$PORT"
+# 尝试自动开放防火墙端口（支持iptables/firewalld/ufw）
+echo "尝试自动开放新端口..."
+if command -v iptables >/dev/null 2>&1; then
+  # 检查并添加iptables规则
+  if ! iptables -C INPUT -p tcp --dport "$new_port" -j ACCEPT 2>/dev/null; then
+    iptables -I INPUT 1 -p tcp --dport "$new_port" -j ACCEPT
+    echo "已添加iptables规则允许TCP端口 $new_port"
+  else
+    echo "iptables规则已存在"
+  fi
+  # 保存规则（兼容常见保存方式）
+  if command -v iptables-save >/dev/null 2>&1; then
+    mkdir -p /etc/iptables
+    iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
+  fi
+elif command -v firewalld >/dev/null 2>&1; then
+  if systemctl is-active --quiet firewalld; then
+    firewall-cmd --permanent --add-port="$new_port"/tcp && firewall-cmd --reload
+    echo "已通过firewalld开放端口 $new_port"
+  else
+    echo "firewalld未运行，请手动开放端口"
+  fi
+elif command -v ufw >/dev/null 2>&1; then
+  ufw allow "$new_port"/tcp && echo "已通过ufw开放端口 $new_port"
+else
+  echo -e "${YELLOW}未检测到常见防火墙管理工具，请手动开放端口 $new_port${NC}"
+fi
+
+echo -e "${GREEN}SSH端口已成功修改为 ${new_port}${NC}"
+echo -e "${YELLOW}重要提示：${NC}"
+echo "1. 请保持当前SSH会话开启，另开一个新终端测试新端口连接是否正常。"
+echo "2. 确认新端口可连接后，再关闭当前会话。"
+echo "3. 如果无法连接，可恢复备份：cp /etc/ssh/sshd_config.bak /etc/ssh/sshd_config && systemctl restart sshd"
