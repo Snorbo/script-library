@@ -36,9 +36,9 @@ EOF
 # 函数：显示菜单
 show_menu() {
     clear
-    print_logo
     echo -e "${BLUE}========================================${NC}"
-    echo -e "${GREEN}              面板${NC}"
+    print_logo
+    echo -e "${GREEN}             综合面板${NC}"
     echo -e "${BLUE}========================================${NC}"
     echo "1. 修改 SSH 连接端口"
     echo "2. 启用 SSH 密钥连接"
