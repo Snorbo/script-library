@@ -36,9 +36,10 @@ show_menu() {
     echo "11. 配置系统更新（update & full-upgrade & autoremove）"
     echo "12. Ubuntu系统升级（24升级26）"
     echo "13. 安装Adguardhome"
+    echo "14. 查看系统信息"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
-    echo -n "请输入选项 [0-13]: "
+    echo -n "请输入选项 [0-14]: "
 }
 
 # 1. 修改 SSH 端口
@@ -219,6 +220,14 @@ option13() {
     echo -e "${GREEN}若需卸载可执行：wget --no-verbose -O - https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -u${NC}"
     read -p "按回车键继续..."
 }
+
+# 14. 查看系统信息
+option14() {
+    echo -e "${YELLOW}执行：修改 SSH 连接端口...${NC}"
+    bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/sysinfo.sh)
+    echo -e "${GREEN}完成。${NC}"
+    read -p "按回车键继续..."
+}
 # 主循环
 while true; do
     show_menu
@@ -237,6 +246,7 @@ while true; do
         11) option11 ;;
         12) option12 ;;
         13) option13 ;;
+        14) option14 ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
     esac
