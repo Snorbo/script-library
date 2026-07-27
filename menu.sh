@@ -215,7 +215,7 @@ option13() {
     echo -e "${YELLOW}====== 系统升级 ======${NC}"
     echo -e "${BLUE}→ 执行 Adguardhome安装脚本 ...${NC}"
     curl -s -S -L https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -v
-    echo -e "${GREEN}系统升级完成。${NC}"
+    echo -e "${GREEN}Adguardhome安装完成。${NC}"
     read -p "按回车键继续..."
 }
 # 主循环
