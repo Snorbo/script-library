@@ -216,6 +216,7 @@ option13() {
     echo -e "${BLUE}→ 执行 Adguardhome安装脚本 ...${NC}"
     curl -s -S -L https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -v
     echo -e "${GREEN}Adguardhome安装完成。${NC}"
+    echo -e "${GREEN}若需卸载可执行：wget --no-verbose -O - https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -u${NC}"
     read -p "按回车键继续..."
 }
 # 主循环
