@@ -16,12 +16,29 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+# 打印 Logo
+print_logo() {
+    if command -v figlet >/dev/null 2>&1; then
+        figlet -f standard "SNORBO"
+    elif command -v toilet >/dev/null 2>&1; then
+        toilet -f standard "SNORBO"
+    else
+        cat << 'EOF'
+  SSS  N   N  OOO  RRRR  BBB   OOO 
+ S     NN  N O   O R   R B   B O   O
+  SSS  N N N O   O RRRR  BBBB  O   O
+     S N  NN O   O R R   B   B O   O
+  SSS  N   N  OOO  R  R  BBBB   OOO 
+EOF
+    fi
+}
 
 # 函数：显示菜单
 show_menu() {
     clear
+    print_logo
     echo -e "${BLUE}========================================${NC}"
-    echo -e "${GREEN}         面板@By Snorbo${NC}"
+    echo -e "${GREEN}              面板${NC}"
     echo -e "${BLUE}========================================${NC}"
     echo "1. 修改 SSH 连接端口"
     echo "2. 启用 SSH 密钥连接"
