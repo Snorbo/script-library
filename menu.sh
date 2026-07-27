@@ -205,6 +205,7 @@ option12() {
     sudo do-release-upgrade -d
     echo -e "${GREEN}系统升级完成。${NC}"
     read -p "按回车键继续..."
+}
 # 主循环
 while true; do
     show_menu
