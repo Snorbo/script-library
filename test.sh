@@ -6,7 +6,7 @@ print_logo() {
         toilet -f standard "SNORBO"
     else
         cat << 'EOF'
-  SSS   N   N  OOO  RRRR  BBB   OOO 
+  SSS  N   N  OOO  RRRR  BBB   OOO 
  S     NN  N O   O R   R B   B O   O
   SSS  N N N O   O RRRR  BBBB  O   O
      S N  NN O   O R R   B   B O   O
