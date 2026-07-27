@@ -33,6 +33,7 @@ show_menu() {
     echo "8. 安装支持 BBR 的内核（带参数 1）"
     echo "9. 安装 3x-ui 面板"
     echo "10. 配置通配符证书（Certbot + Cloudflare DNS）"
+    echo "11. 配置系统更新（update & full-upgrade & autoremove）"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
     echo -n "请输入选项 [0-9]: "
@@ -182,6 +183,19 @@ EOF
 
     read -p "按回车键继续..."
 }
+
+# 11. 配置系统更新（update & full-upgrade & autoremove）
+option11() {
+    echo -e "${YELLOW}====== 配置系统更新 ======${NC}"
+    echo -e "${BLUE}→ 执行 sudo apt update ...${NC}"
+    sudo apt update
+    echo -e "${BLUE}→ 执行 sudo apt full-upgrade -y ...${NC}"
+    sudo apt full-upgrade -y
+    echo -e "${BLUE}→ 执行 sudo apt autoremove -y ...${NC}"
+    sudo apt autoremove -y
+    echo -e "${GREEN}系统更新完成。${NC}"
+    read -p "按回车键继续..."
+}
 # 主循环
 while true; do
     show_menu
@@ -197,6 +211,7 @@ while true; do
         8) option8 ;;
         9) option9 ;;
         10) option10 ;;
+        11) option11 ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
     esac
