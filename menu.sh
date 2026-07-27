@@ -34,9 +34,10 @@ show_menu() {
     echo "9. 安装 3x-ui 面板"
     echo "10. 配置通配符证书（Certbot + Cloudflare DNS）"
     echo "11. 配置系统更新（update & full-upgrade & autoremove）"
+    echo "12. Ubuntu系统升级（24升级26）"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
-    echo -n "请输入选项 [0-9]: "
+    echo -n "请输入选项 [0-12]: "
 }
 
 # 1. 修改 SSH 端口
@@ -196,6 +197,14 @@ option11() {
     echo -e "${GREEN}系统更新完成。${NC}"
     read -p "按回车键继续..."
 }
+
+# 12. Ubuntu系统升级
+option12() {
+    echo -e "${YELLOW}====== 系统升级 ======${NC}"
+    echo -e "${BLUE}→ 执行 sudo do-release-upgrade -d ...${NC}"
+    sudo do-release-upgrade -d
+    echo -e "${GREEN}系统升级完成。${NC}"
+    read -p "按回车键继续..."
 # 主循环
 while true; do
     show_menu
@@ -212,6 +221,7 @@ while true; do
         9) option9 ;;
         10) option10 ;;
         11) option11 ;;
+        12) option12 ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
     esac
