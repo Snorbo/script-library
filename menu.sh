@@ -43,7 +43,7 @@ show_menu() {
     echo "1. 修改 SSH 连接端口"
     echo "2. 启用 SSH 密钥连接"
     echo "3. 禁用 IPQS（写入 hosts）"
-    echo "4. 空出 53 端口（调整 systemd-resolved）"
+    echo "4. 空出 53 端口（仅适用于Ubuntu）"
     echo "5. 调用 IP 质量检测脚本"
     echo "6. 调用流媒体解锁检测脚本"
     echo "7. 安装 nexttrace"
