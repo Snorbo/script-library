@@ -198,6 +198,8 @@ EOF
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}证书申请成功！证书位置：/etc/letsencrypt/live/${wildcard_domain}/${NC}"
+        echo -e "${GREEN}证书位置：/etc/letsencrypt/live/${wildcard_domain}/fullchain.pem${NC}"
+        echo -e "${GREEN}私钥位置：/etc/letsencrypt/live/${wildcard_domain}/privkey.pem${NC}"
         echo -e "${GREEN}子命令certificates显示所有证书的信息；revoke吊销证书；delete删除证书${NC}"
         echo -e "${GREEN}示例：sudo certbot certificates ${NC}"
     else
