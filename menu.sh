@@ -44,23 +44,23 @@ show_menu() {
     echo "4. 空出 53 端口"
     echo "5. 调用 IP 质量检测脚本"
     echo "6. 调用流媒体解锁检测脚本"
-    echo "!. 调用 NodeQuality 检测脚本"
+    echo "7. 调用 NodeQuality 检测脚本"
     echo "------安装应用"
-    echo "7. 安装 nexttrace"
-    echo "8. 安装支持 BBR3 的内核"
-    echo "9. 安装 3x-ui 面板"
-    echo "!13. 安装Adguardhome"
+    echo "8. 安装 nexttrace"
+    echo "9. 安装支持 BBR3 的内核"
+    echo "10. 安装 3x-ui 面板"
+    echo "11. 安装Adguardhome"
     echo "------系统相关"
-    echo "11. 配置系统更新"
-    echo "12. Ubuntu24升级Ubuntu26"
+    echo "12. 配置系统更新"
+    echo "13. Ubuntu24升级Ubuntu26"
     echo "14. 查看系统信息"
     echo "15. 系统清理"
-    echo "!. 设置虚拟内存"
+    echo "16. 设置虚拟内存"
     echo "------证书"
-    echo "!10. 配置通配符证书"
+    echo "17. 配置通配符证书"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
-    echo -n "请输入选项 [0-15]: "
+    echo -n "请输入选项 [0-17]: "
 }
 
 # 1. 修改 SSH 端口
@@ -114,16 +114,24 @@ option6() {
     read -p "按回车键继续..."
 }
 
-# 7. 安装 nexttrace
+# 7. NodeQuality 检测
 option7() {
+    echo -e "${YELLOW}执行：NodeQuality 检测...${NC}"
+    bash <(curl -sL https://run.NodeQuality.com)
+    echo -e "${GREEN}完成。${NC}"
+    read -p "按回车键继续..."
+}
+
+# 8. 安装 nexttrace
+option8() {
     echo -e "${YELLOW}执行：安装 nexttrace...${NC}"
     curl -sL nxtrace.org/nt | bash
     echo -e "${GREEN}完成。${NC}"
     read -p "按回车键继续..."
 }
 
-# 8. 安装 BBR 内核（带参数 1）
-option8() {
+# 9. 安装 BBR 内核（带参数 1）
+option9() {
     echo -e "${YELLOW}执行：安装支持 BBR 的内核（参数 1）...${NC}"
     # 使用 bash <(curl) 传递参数 1
     bash <(curl -s https://raw.githubusercontent.com/Snorbo/public/refs/heads/main/2026newconfig/bbr.sh) 1
@@ -131,16 +139,74 @@ option8() {
     read -p "按回车键继续..."
 }
 
-# 9. 安装 3x-ui 面板
-option9() {
+# 10. 安装 3x-ui 面板
+option10() {
     echo -e "${YELLOW}执行：安装 3x-ui 面板...${NC}"
     bash <(curl -Ls https://raw.githubusercontent.com/mhsanaei/3x-ui/master/install.sh)
     echo -e "${GREEN}完成。${NC}"
     read -p "按回车键继续..."
 }
 
-# 10. 配置通配符证书（Certbot + Cloudflare DNS）
-option10() {
+# 11. 安装Adguardhome
+option11() {
+    echo -e "${YELLOW}====== 系统升级 ======${NC}"
+    echo -e "${BLUE}→ 执行 Adguardhome安装脚本 ...${NC}"
+    curl -s -S -L https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -v
+    echo -e "${GREEN}Adguardhome安装完成。${NC}"
+    echo -e "${GREEN}若需卸载可执行：wget --no-verbose -O - https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -u${NC}"
+    read -p "按回车键继续..."
+}
+
+# 12. 配置系统更新（update & full-upgrade & autoremove）
+option12() {
+    echo -e "${YELLOW}====== 配置系统更新 ======${NC}"
+    echo -e "${BLUE}→ 执行 sudo apt update ...${NC}"
+    sudo apt update
+    echo -e "${BLUE}→ 执行 sudo apt full-upgrade -y ...${NC}"
+    sudo apt full-upgrade -y
+    echo -e "${BLUE}→ 执行 sudo apt autoremove -y ...${NC}"
+    sudo apt autoremove -y
+    echo -e "${GREEN}系统更新完成。${NC}"
+    read -p "按回车键继续..."
+}
+
+# 13. Ubuntu系统升级
+option13() {
+    echo -e "${YELLOW}====== 系统升级 ======${NC}"
+    echo -e "${BLUE}→ 执行 sudo do-release-upgrade ...${NC}"
+    sudo do-release-upgrade
+    echo -e "${GREEN}系统升级完成。${NC}"
+    read -p "按回车键继续..."
+}
+
+# 14. 查看系统信息
+option14() {
+    echo -e "${YELLOW}执行：拉取信息获取脚本...${NC}"
+    bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/sysinfo.sh)
+    echo -e "${GREEN}完成。${NC}"
+    read -p "按回车键继续..."
+}
+
+# 15. 系统清理
+option15() {
+    echo -e "${YELLOW}执行：拉取清理脚本...${NC}"
+    bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/sysclean.sh)
+    echo -e "${GREEN}完成。${NC}"
+    read -p "按回车键继续..."
+}
+
+# 16. 设置虚拟内存
+option16() {
+    echo -e "${YELLOW}执行：设置虚拟内存...${NC}"
+    bash <(curl -L -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/swap.sh)
+    echo -e "${GREEN}完成。${NC}"
+    read -p "按回车键继续..."
+}
+
+
+
+# 17. 配置通配符证书（Certbot + Cloudflare DNS）
+option17() {
     echo -e "${YELLOW}====== 配置通配符证书（Certbot + Cloudflare DNS） ======${NC}"
     
     # 1. 移除旧版 certbot（如有）
@@ -211,54 +277,6 @@ EOF
 
     read -p "按回车键继续..."
 }
-
-# 11. 配置系统更新（update & full-upgrade & autoremove）
-option11() {
-    echo -e "${YELLOW}====== 配置系统更新 ======${NC}"
-    echo -e "${BLUE}→ 执行 sudo apt update ...${NC}"
-    sudo apt update
-    echo -e "${BLUE}→ 执行 sudo apt full-upgrade -y ...${NC}"
-    sudo apt full-upgrade -y
-    echo -e "${BLUE}→ 执行 sudo apt autoremove -y ...${NC}"
-    sudo apt autoremove -y
-    echo -e "${GREEN}系统更新完成。${NC}"
-    read -p "按回车键继续..."
-}
-
-# 12. Ubuntu系统升级
-option12() {
-    echo -e "${YELLOW}====== 系统升级 ======${NC}"
-    echo -e "${BLUE}→ 执行 sudo do-release-upgrade ...${NC}"
-    sudo do-release-upgrade
-    echo -e "${GREEN}系统升级完成。${NC}"
-    read -p "按回车键继续..."
-}
-
-# 13. 安装Adguardhome
-option13() {
-    echo -e "${YELLOW}====== 系统升级 ======${NC}"
-    echo -e "${BLUE}→ 执行 Adguardhome安装脚本 ...${NC}"
-    curl -s -S -L https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -v
-    echo -e "${GREEN}Adguardhome安装完成。${NC}"
-    echo -e "${GREEN}若需卸载可执行：wget --no-verbose -O - https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -u${NC}"
-    read -p "按回车键继续..."
-}
-
-# 14. 查看系统信息
-option14() {
-    echo -e "${YELLOW}执行：拉取信息获取脚本...${NC}"
-    bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/sysinfo.sh)
-    echo -e "${GREEN}完成。${NC}"
-    read -p "按回车键继续..."
-}
-
-# 15. 系统清理
-option15() {
-    echo -e "${YELLOW}执行：拉取清理脚本...${NC}"
-    bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/sysclean.sh)
-    echo -e "${GREEN}完成。${NC}"
-    read -p "按回车键继续..."
-}
 # 主循环
 while true; do
     show_menu
@@ -279,6 +297,8 @@ while true; do
         13) option13 ;;
         14) option14 ;;
         15) option15 ;;
+        16) option16 ;;
+        17) option17 ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
     esac
