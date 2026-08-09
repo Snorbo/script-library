@@ -181,7 +181,7 @@ fetch_remote_ssh_keys() {
 fetch_github_ssh_keys() {
     local username="$1"
     if [[ -z "$username" ]]; then
-        read -e -p "请输入 GitHub 用户名: " username
+        read -e -p "请输入 GitHub 用户名: (Snorbo)" username
     fi
     if [[ -z "$username" ]]; then
         echo -e "${gl_hong}用户名不能为空。${gl_bai}"
