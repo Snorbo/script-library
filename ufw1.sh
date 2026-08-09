@@ -370,7 +370,7 @@ enable_firewall() {
     check_ufw_installed || return
     if [[ -n "${SSH_CONNECTION:-}" ]]; then
         echo "检测到当前会话通过 SSH 连接。启用 UFW 前应先放行 SSH，否则可能断开连接。"
-        read -r -p "是否添加 OpenSSH/22 TCP 规则？（Y/n）：" confirm
+        read -r -p "是否添加 OpenSSH/1556 TCP 规则？（Y/n）：" confirm
         if [[ ! "${confirm:-Y}" =~ ^[Yy]$ ]]; then
             read -r -p "仍要启用 UFW 并承担 SSH 断连风险？请输入 ENABLE：" confirm
             [[ "$confirm" == ENABLE ]] || { echo "操作已取消。"; pause_screen; return; }
@@ -378,7 +378,7 @@ enable_firewall() {
             if "$UFW_BIN" app info OpenSSH >/dev/null 2>&1; then
                 ufw_change allow OpenSSH || { pause_screen; return; }
             else
-                ufw_change allow 22/tcp || { pause_screen; return; }
+                ufw_change allow 1556/tcp || { pause_screen; return; }
             fi
         fi
     else
