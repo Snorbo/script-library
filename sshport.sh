@@ -42,7 +42,7 @@ cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
 echo "已备份配置文件到 /etc/ssh/sshd_config.bak"
 
 # 修改端口（删除原有Port行，在文件首行插入新Port）
-sed -i '/^[[:space:]]*#\?[[:space:]]*Port[[:space:]]\+/d' /etc/ssh/sshd_config
+sed -Ei '/^[[:space:]]*#?[[:space:]]*Port[[:space:]]+[0-9]+([[:space:]]|$)/d' /etc/ssh/sshd_config
 sed -i "1i Port $new_port" /etc/ssh/sshd_config
 
 # 重启SSH服务
