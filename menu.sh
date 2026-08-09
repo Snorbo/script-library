@@ -99,11 +99,12 @@ show_menu() {
     echo "------额外选项"
     echo "21. 安装快捷命令 z（可直接输入 z 启动菜单）"
     echo "22. 解除快捷命令 z"
-    echo "23. 安装基础包"
+    echo "23. 安装基础包"3
+    echo "24. 配置ufw防火墙"
     echo "99. 端口备忘"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
-    echo -n "请输入选项 [0-23]: "
+    echo -n "请输入选项 [0-24]: "
 }
 
 # 1. 修改 SSH 端口
@@ -411,6 +412,14 @@ option23() {
     read -p "按回车键继续..."
 }
 
+# 24. 配置ufw防火墙
+option2() {
+    echo -e "${YELLOW}正在拉取脚本...${NC}"
+    bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/ufw.sh)
+    echo -e "${GREEN}完成。${NC}"
+    read -p "按回车键继续..."
+}
+
 option99() {
     clear
     echo -e "${YELLOW}====== 端口备忘 ======${NC}"
@@ -459,6 +468,7 @@ while true; do
         21) install_z_shortcut ;;
         22) remove_z_shortcut ;;
         23) option23 ;;
+        24) option24 ;;
         99) option99 ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
