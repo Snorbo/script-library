@@ -349,7 +349,7 @@ while true; do
         17) option17 ;;
         18) install_z_shortcut ;;
         19) remove_z_shortcut ;;
-        20）option20 ;;
+        20) option20 ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
     esac
