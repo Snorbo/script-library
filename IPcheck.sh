@@ -4,25 +4,6 @@ CURRENT_SCRIPT_PATH=$(readlink -f "$0")
 DEFAULT_ARG="-4"
 RAW_SCRIPT=$(curl -Ls https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/ip_clear.sh)
 
-# 自动检测并配置快捷键 'z'
-## 检测当前 Shell 配置文件
-if [ -n "$ZSH_VERSION" ]; then
-    CONF_FILE="$HOME/.zshrc"
-else
-    CONF_FILE="$HOME/.bashrc"
-fi
-
-## 检查是否已经配置过别名
-if ! grep -q "alias z=" "$CONF_FILE"; then
-    echo "提示: 检测到首次运行，正在为你配置快捷键 'z'..."
-    echo "alias z='$CURRENT_SCRIPT_PATH'" >> "$CONF_FILE"
-    echo "--------------------------------------------------"
-    echo "配置成功！由于系统限制，当前窗口需要手动输入: source $CONF_FILE"
-    echo "或者直接重新打开一个终端窗口，之后就可以随时使用快捷键 [ z ] 了！"
-    echo "=================================================="
-    echo ""
-fi
-
 echo "=================================================="
 echo "          IP Check 快捷运行脚本"
 echo "=================================================="
