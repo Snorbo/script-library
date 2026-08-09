@@ -413,7 +413,7 @@ option23() {
 }
 
 # 24. 配置ufw防火墙
-option2() {
+option24() {
     echo -e "${YELLOW}正在拉取脚本...${NC}"
     bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/ufw.sh)
     echo -e "${GREEN}完成。${NC}"
