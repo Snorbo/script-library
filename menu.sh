@@ -84,22 +84,25 @@ show_menu() {
     echo "8. 安装 nexttrace"
     echo "9. 安装支持 BBR3 的内核"
     echo "10. 安装 3x-ui 面板"
-    echo "11. 安装Adguardhome"
+    echo "11. 安装 Adguardhome"
+    echo "12. 安装 Openlist"
+    echo "13. 安装 nginx"
+    echo "14. 配置 nginx.conf"
     echo "------系统相关"
-    echo "12. 配置系统更新"
-    echo "13. Ubuntu24升级Ubuntu26"
-    echo "14. 查看系统信息"
-    echo "15. 系统清理"
-    echo "16. 设置虚拟内存"
+    echo "15. 配置系统更新"
+    echo "16. Ubuntu24升级Ubuntu26"
+    echo "17. 查看系统信息"
+    echo "18. 系统清理"
+    echo "19. 设置虚拟内存"
     echo "------证书"
-    echo "17. 配置通配符证书"
+    echo "20. 配置通配符证书"
     echo "------额外选项"
-    echo "18. 安装快捷命令 z（可直接输入 z 启动菜单）"
-    echo "19. 解除快捷命令 z"
-    echo "20. 安装基础包"
+    echo "21. 安装快捷命令 z（可直接输入 z 启动菜单）"
+    echo "22. 解除快捷命令 z"
+    echo "23. 安装基础包"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
-    echo -n "请输入选项 [0-20]: "
+    echo -n "请输入选项 [0-23]: "
 }
 
 # 1. 修改 SSH 端口
@@ -130,7 +133,7 @@ option3() {
 # 4. 空出 53 端口
 option4() {
     echo -e "${YELLOW}执行：空出 53 端口（调整 systemd-resolved）...${NC}"
-    sudo bash -c 'echo -e "[Resolve]\nDNS=8.8.8.8 1.1.1.1\nDNSStubListener=no" > /etc/systemd/resolved.conf && \
+    sudo bash -c 'echo -e "[Resolve]\nDNS=1.1.1.1 8.8.8.8\nDNSStubListener=no" > /etc/systemd/resolved.conf && \
                    ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf && \
                    systemctl restart systemd-resolved'
     echo -e "${GREEN}完成。${NC}"
@@ -189,15 +192,99 @@ option10() {
 # 11. 安装Adguardhome
 option11() {
     echo -e "${YELLOW}====== 系统升级 ======${NC}"
-    echo -e "${BLUE}→ 执行 Adguardhome安装脚本 ...${NC}"
+    echo -e "${BLUE}→ 执行 Adguardhome 安装脚本 ...${NC}"
     curl -s -S -L https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -v
     echo -e "${GREEN}Adguardhome安装完成。${NC}"
     echo -e "${GREEN}若需卸载可执行：wget --no-verbose -O - https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -u${NC}"
     read -p "按回车键继续..."
 }
 
-# 12. 配置系统更新（update & full-upgrade & autoremove）
+# 12. 安装Openlist
 option12() {
+    echo -e "${YELLOW}====== 系统升级 ======${NC}"
+    echo -e "${BLUE}→ 执行 Openlist 安装脚本 ...${NC}"
+    curl -s -S -L https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -v
+    echo -e "${GREEN}Openlist安装完成。${NC}"
+    read -p "按回车键继续..."
+}
+
+# 13. 编译安装 Nginx
+option13() {
+    echo -e "${YELLOW}====== 编译安装 Nginx ======${NC}"
+
+    local nginx_version="1.31.3"
+    local nginx_tar="nginx-${nginx_version}.tar.gz"
+    local nginx_dir="nginx-${nginx_version}"
+
+    echo -e "${BLUE}→ 安装编译依赖...${NC}"
+    sudo apt update
+    sudo apt install -y wget gcc make libpcre3 libpcre3-dev zlib1g zlib1g-dev libssl-dev
+
+    echo -e "${BLUE}→ 下载 Nginx ${nginx_version}...${NC}"
+    cd /usr/local/src || exit 1
+    sudo wget -O "$nginx_tar" "https://nginx.org/download/${nginx_tar}"
+
+    echo -e "${BLUE}→ 解压源码...${NC}"
+    sudo tar -zxvf "$nginx_tar"
+    cd "$nginx_dir" || exit 1
+
+    echo -e "${BLUE}→ 配置编译参数...${NC}"
+    sudo ./configure \
+        --prefix=/usr/local/nginx \
+        --with-http_ssl_module \
+        --with-http_v2_module \
+        --with-http_v3_module \
+        --with-stream \
+        --with-stream_ssl_module \
+        --with-http_realip_module \
+        --with-stream_ssl_preread_module
+
+    echo -e "${BLUE}→ 编译并安装...${NC}"
+    sudo make
+    sudo make install
+
+    echo -e "${BLUE}→ 配置 Nginx systemd 服务...${NC}"
+    sudo tee /etc/systemd/system/nginx.service >/dev/null <<'EOF'
+[Unit]
+Description=The NGINX HTTP and reverse proxy server
+After=syslog.target network-online.target remote-fs.target nss-lookup.target
+After=xray.service
+
+[Service]
+Type=forking
+ExecStartPre=/usr/local/nginx/sbin/nginx -t
+ExecStart=/usr/local/nginx/sbin/nginx
+ExecReload=/usr/local/nginx/sbin/nginx -s reload
+ExecStop=/bin/kill -s QUIT $MAINPID
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    echo -e "${BLUE}→ 添加 Nginx 到 PATH...${NC}"
+    echo 'export PATH=$PATH:/usr/local/nginx/sbin' | sudo tee /etc/profile.d/nginx-path.sh >/dev/null
+
+    echo -e "${BLUE}→ 启用并启动 Nginx...${NC}"
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now nginx
+
+    echo -e "${GREEN}Nginx 编译安装完成。${NC}"
+    sudo systemctl status nginx --no-pager
+
+    read -p "按回车键继续..."
+}
+
+# 14. 修改 nginx.conf
+option14() {
+    echo -e "${YELLOW}执行nginx.conf修改脚本...${NC}"
+    bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/nginxconf.sh)
+    echo -e "${GREEN}完成。${NC}"
+    read -p "按回车键继续..."
+}
+
+# 15. 配置系统更新（update & full-upgrade & autoremove）
+option15() {
     echo -e "${YELLOW}====== 配置系统更新 ======${NC}"
     echo -e "${BLUE}→ 执行 sudo apt update ...${NC}"
     sudo apt update
@@ -209,8 +296,8 @@ option12() {
     read -p "按回车键继续..."
 }
 
-# 13. Ubuntu系统升级
-option13() {
+# 16. Ubuntu系统升级
+option16() {
     echo -e "${YELLOW}====== 系统升级 ======${NC}"
     echo -e "${BLUE}→ 执行 sudo do-release-upgrade ...${NC}"
     sudo do-release-upgrade
@@ -218,34 +305,32 @@ option13() {
     read -p "按回车键继续..."
 }
 
-# 14. 查看系统信息
-option14() {
+# 17. 查看系统信息
+option17() {
     echo -e "${YELLOW}执行：拉取信息获取脚本...${NC}"
     bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/sysinfo.sh)
     echo -e "${GREEN}完成。${NC}"
     read -p "按回车键继续..."
 }
 
-# 15. 系统清理
-option15() {
+# 18. 系统清理
+option18() {
     echo -e "${YELLOW}执行：拉取清理脚本...${NC}"
     bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/sysclean.sh)
     echo -e "${GREEN}完成。${NC}"
     read -p "按回车键继续..."
 }
 
-# 16. 设置虚拟内存
-option16() {
+# 19. 设置虚拟内存
+option19() {
     echo -e "${YELLOW}执行：设置虚拟内存...${NC}"
     bash <(curl -L -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/swap.sh)
     echo -e "${GREEN}完成。${NC}"
     read -p "按回车键继续..."
 }
 
-
-
-# 17. 配置通配符证书（Certbot + Cloudflare DNS）
-option17() {
+# 20. 配置通配符证书（Certbot + Cloudflare DNS）
+option20() {
     echo -e "${YELLOW}====== 配置通配符证书（Certbot + Cloudflare DNS） ======${NC}"
     
     # 1. 移除旧版 certbot（如有）
@@ -317,8 +402,8 @@ EOF
     read -p "按回车键继续..."
 }
 
-# 20. 安装基础包
-option20() {
+# 23. 安装基础包
+option23() {
     echo -e "${YELLOW}执行：安装基础工具...${NC}"
     sudo apt update && sudo apt install -y curl wget sudo socat htop unzip tar tmux vim nano git
     echo -e "${GREEN}基础工具安装完成。${NC}"
@@ -347,9 +432,12 @@ while true; do
         15) option15 ;;
         16) option16 ;;
         17) option17 ;;
-        18) install_z_shortcut ;;
-        19) remove_z_shortcut ;;
+        18) option18 ;;
+        19) option19 ;;
         20) option20 ;;
+        21) install_z_shortcut ;;
+        22) remove_z_shortcut ;;
+        23) option23 ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
     esac
