@@ -15,6 +15,26 @@ NC='\033[0m' # No Color
 #定义快捷键z相关
 SCRIPT_PATH="$(readlink -f "$0")"
 
+#解绑z键
+remove_z_shortcut() {
+    local target="/usr/local/bin/z"
+
+    if [ "$EUID" -ne 0 ]; then
+        sudo rm -f "$target"
+    else
+        rm -f "$target"
+    fi
+
+    unalias z 2>/dev/null || true
+    sed -i '/^[[:space:]]*alias z=/d' "$HOME/.bashrc" 2>/dev/null || true
+    sed -i '/^[[:space:]]*alias z=/d' "$HOME/.zshrc" 2>/dev/null || true
+    hash -r 2>/dev/null || true
+
+    echo -e "${GREEN}已解绑快捷命令 z${NC}"
+    read -p "按回车键继续..."
+}
+
+#绑定z键
 install_z_shortcut() {
     local target="/usr/local/bin/z"
     if [ "$EUID" -ne 0 ]; then
@@ -74,10 +94,11 @@ show_menu() {
     echo "------证书"
     echo "17. 配置通配符证书"
     echo "------额外选项"
-    echo "18. 安装快捷命令 z（可直接输入 z 启动菜单）"
+    echo "18. 解除快捷命令 z（可直接输入 z 启动菜单）"
+    echo "19. 安装快捷命令 z（可直接输入 z 启动菜单）"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
-    echo -n "请输入选项 [0-17]: "
+    echo -n "请输入选项 [0-19]: "
 }
 
 # 1. 修改 SSH 端口
@@ -317,6 +338,7 @@ while true; do
         16) option16 ;;
         17) option17 ;;
         18) install_z_shortcut ;;
+        18) remove_z_shortcut ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
     esac
