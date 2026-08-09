@@ -96,9 +96,10 @@ show_menu() {
     echo "------额外选项"
     echo "18. 安装快捷命令 z（可直接输入 z 启动菜单）"
     echo "19. 解除快捷命令 z"
+    echo "20. 安装基础包"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
-    echo -n "请输入选项 [0-19]: "
+    echo -n "请输入选项 [0-20]: "
 }
 
 # 1. 修改 SSH 端口
@@ -315,6 +316,15 @@ EOF
 
     read -p "按回车键继续..."
 }
+
+# 20. 安装基础包
+option20() {
+    echo -e "${YELLOW}执行：安装基础工具...${NC}"
+    sudo apt update && sudo apt install -y curl wget sudo socat htop unzip tar tmux vim nano git
+    echo -e "${GREEN}基础工具安装完成。${NC}"
+    read -p "按回车键继续..."
+}
+
 # 主循环
 while true; do
     show_menu
@@ -339,6 +349,7 @@ while true; do
         17) option17 ;;
         18) install_z_shortcut ;;
         19) remove_z_shortcut ;;
+        20）option20 ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
     esac
