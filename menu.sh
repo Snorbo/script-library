@@ -1,9 +1,4 @@
 #!/bin/bash
-# ==================================================
-# 系统初始化 & 工具箱菜单
-# 用法：sudo ./menu.sh
-# ==================================================
-
 # 检查是否以 root 运行（多数操作需要提权）
 if [ "$EUID" -ne 0 ]; then
     echo -e "\033[33m警告：建议以 root 用户执行此脚本，否则部分命令可能因权限不足而失败。\033[0m"
@@ -16,6 +11,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
 # 打印 Logo
 print_logo() {
     if command -v figlet >/dev/null 2>&1; then
@@ -40,21 +36,28 @@ show_menu() {
     print_logo
     echo -e "${GREEN}             综合面板${NC}"
     echo -e "${BLUE}========================================${NC}"
+    echo "------配置SSH"
     echo "1. 修改 SSH 连接端口"
     echo "2. 启用 SSH 密钥连接"
+    echo "------检测脚本与相关配置"
     echo "3. 禁用 IPQS（写入 hosts）"
-    echo "4. 空出 53 端口（仅适用于Ubuntu）"
+    echo "4. 空出 53 端口"
     echo "5. 调用 IP 质量检测脚本"
     echo "6. 调用流媒体解锁检测脚本"
+    echo "!. 调用 NodeQuality 检测脚本"
+    echo "------安装应用"
     echo "7. 安装 nexttrace"
-    echo "8. 安装支持 BBR 的内核（带参数 1）"
+    echo "8. 安装支持 BBR3 的内核"
     echo "9. 安装 3x-ui 面板"
-    echo "10. 配置通配符证书（Certbot + Cloudflare DNS）"
-    echo "11. 配置系统更新（update & full-upgrade & autoremove）"
-    echo "12. Ubuntu系统升级（24升级26）"
-    echo "13. 安装Adguardhome"
+    echo "!13. 安装Adguardhome"
+    echo "------系统相关"
+    echo "11. 配置系统更新"
+    echo "12. Ubuntu24升级Ubuntu26"
     echo "14. 查看系统信息"
     echo "15. 系统清理"
+    echo "!. 设置虚拟内存"
+    echo "------证书"
+    echo "!10. 配置通配符证书"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
     echo -n "请输入选项 [0-15]: "
