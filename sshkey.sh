@@ -203,6 +203,7 @@ show_menu() {
     echo "4. 从 URL 导入公钥"
     echo "5. 从 GitHub 导入公钥"
     echo "6. 生成新密钥对并启用"
+    echo "7. 重启服务器"
     echo "0. 退出"
     echo "=========================================="
     read -e -p "请输入选项 (0-6): " choice
@@ -236,6 +237,9 @@ show_menu() {
             ;;
         6)
             add_sshkey
+            ;;
+        7)
+            reboot
             ;;
         0)
             exit 0
