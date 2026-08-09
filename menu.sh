@@ -119,8 +119,7 @@ option1() {
 option2() {
     echo -e "${YELLOW}执行：启用 SSH 密钥连接...${NC}"
     bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/sshkey.sh)
-    echo -e "${GREEN}完成，服务器即将重启${NC}"
-    reboot
+    echo -e "${GREEN}完成。${NC}"
     read -p "按回车键继续..."
 }
 
