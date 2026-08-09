@@ -12,6 +12,21 @@ YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+#定义快捷键z相关
+SCRIPT_PATH="$(readlink -f "$0")"
+
+install_z_shortcut() {
+    local target="/usr/local/bin/z"
+    if [ "$EUID" -ne 0 ]; then
+        sudo ln -sf "$SCRIPT_PATH" "$target"
+    else
+        ln -sf "$SCRIPT_PATH" "$target"
+    fi
+    echo -e "${GREEN}已安装快捷命令：z${NC}"
+    echo -e "${GREEN}现在可以直接输入 z 启动这个菜单${NC}"
+    read -p "按回车键继续..."
+}
+
 # 打印 Logo
 print_logo() {
     if command -v figlet >/dev/null 2>&1; then
@@ -58,6 +73,8 @@ show_menu() {
     echo "16. 设置虚拟内存"
     echo "------证书"
     echo "17. 配置通配符证书"
+    echo "------额外选项"
+    echo "18. 安装快捷命令 z（可直接输入 z 启动菜单）"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
     echo -n "请输入选项 [0-17]: "
@@ -299,6 +316,7 @@ while true; do
         15) option15 ;;
         16) option16 ;;
         17) option17 ;;
+        18) install_z_shortcut ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
     esac
