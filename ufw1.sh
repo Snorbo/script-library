@@ -339,14 +339,47 @@ allow_application() {
     pause_screen
 }
 
-limit_ssh() {
+allow_from_source() {
     check_ufw_installed || return
-    local target=OpenSSH
-    if ! "$UFW_BIN" app info OpenSSH >/dev/null 2>&1; then
-        target=22/tcp
+    local source port_spec proto_choice proto comment
+
+    read -r -p "请输入来源地址（IPv4/IPv6/CIDR）：" source
+    if ! valid_source "$source" || [[ "$source" == "any" ]]; then
+        echo "来源地址无效；此功能要求指定具体来源地址。" >&2
+        pause_screen
+        return
     fi
-    if ufw_change limit "$target"; then
-        echo "已添加 SSH 连接速率限制：$target"
+
+    read -r -p "请输入目标端口或端口范围（例如 22 或 8000:8080）：" port_spec
+    if ! valid_port_spec "$port_spec"; then
+        echo "端口必须是 1-65535，范围格式为 起始:结束。" >&2
+        pause_screen
+        return
+    fi
+
+    echo "1. TCP"
+    echo "2. UDP"
+    echo "3. TCP 和 UDP"
+    read -r -p "请选择协议 [1-3]（默认 1）：" proto_choice
+    case "${proto_choice:-1}" in
+        1) proto=tcp ;;
+        2) proto=udp ;;
+        3) proto=both ;;
+        *) echo "无效协议选择。"; pause_screen; return ;;
+    esac
+
+    read -r -p "规则备注（可选，最多 120 字符）：" comment
+    if ! valid_comment "$comment"; then
+        echo "备注过长或包含控制字符。" >&2
+        pause_screen
+        return
+    fi
+
+    local args=(allow from "$source" to any port "$port_spec")
+    [[ "$proto" == both ]] || args+=(proto "$proto")
+    [[ -n "$comment" ]] && args+=(comment "$comment")
+    if ufw_change "${args[@]}"; then
+        echo "已添加来源 $source 到端口 $port_spec 的允许规则。"
     fi
     pause_screen
 }
@@ -368,23 +401,8 @@ delete_rule_by_number() {
 
 enable_firewall() {
     check_ufw_installed || return
-    if [[ -n "${SSH_CONNECTION:-}" ]]; then
-        echo "检测到当前会话通过 SSH 连接。启用 UFW 前应先放行 SSH，否则可能断开连接。"
-        read -r -p "是否添加 OpenSSH/1556 TCP 规则？（Y/n）：" confirm
-        if [[ ! "${confirm:-Y}" =~ ^[Yy]$ ]]; then
-            read -r -p "仍要启用 UFW 并承担 SSH 断连风险？请输入 ENABLE：" confirm
-            [[ "$confirm" == ENABLE ]] || { echo "操作已取消。"; pause_screen; return; }
-        else
-            if "$UFW_BIN" app info OpenSSH >/dev/null 2>&1; then
-                ufw_change allow OpenSSH || { pause_screen; return; }
-            else
-                ufw_change allow 1556/tcp || { pause_screen; return; }
-            fi
-        fi
-    else
-        read -r -p "确认启用 UFW？（y/N）：" confirm
-        [[ "$confirm" =~ ^[Yy]$ ]] || { echo "操作已取消。"; pause_screen; return; }
-    fi
+    read -r -p "确认启用 UFW？（y/N）：" confirm
+    [[ "$confirm" =~ ^[Yy]$ ]] || { echo "操作已取消。"; pause_screen; return; }
     if ufw_change --force enable; then
         echo "防火墙已启用。"
     fi
@@ -470,7 +488,7 @@ show_menu() {
     echo "  1. 查看规则（带编号）"
     echo "  2. 开放端口/端口范围"
     echo "  3. 允许应用配置"
-    echo "  4. 限制 SSH 登录频率"
+    echo "  4. 自定义来源放行端口"
     echo "  5. 删除规则"
     echo "  6. 启用防火墙"
     echo "  7. 禁用防火墙"
@@ -495,7 +513,7 @@ while true; do
         1) list_ports ;;
         2) open_port ;;
         3) allow_application ;;
-        4) limit_ssh ;;
+        4) allow_from_source ;;
         5) delete_rule_by_number ;;
         6) enable_firewall ;;
         7) disable_firewall ;;
