@@ -150,6 +150,46 @@ restore_ufw_backup() {
     pause_screen
 }
 
+delete_ufw_backup() {
+    check_ufw_installed || return
+    [[ -d "$BACKUP_DIR" ]] || { echo "没有找到备份目录：$BACKUP_DIR"; pause_screen; return; }
+
+    local -a backups=()
+    mapfile -t backups < <(find "$BACKUP_DIR" -maxdepth 1 -type f -name 'ufw-*.tar.gz' -printf '%f\n' | sort -r)
+    if (( ${#backups[@]} == 0 )); then
+        echo "没有找到 UFW 备份。"
+        pause_screen
+        return
+    fi
+
+    echo "可删除的备份："
+    local i=1 item
+    for item in "${backups[@]}"; do
+        printf '  %d. %s\n' "$i" "$item"
+        ((i++))
+    done
+
+    local choice selected archive
+    read -r -p "请选择要删除的备份编号：" choice
+    [[ "$choice" =~ ^[0-9]{1,5}$ && 10#$choice -ge 1 && 10#$choice -le ${#backups[@]} ]] || {
+        echo "备份编号无效。"
+        pause_screen
+        return
+    }
+    selected="${backups[$((10#$choice - 1))]}"
+    archive="$BACKUP_DIR/$selected"
+    read -r -p "将永久删除 $selected，请输入 DELETE 确认：" choice
+    [[ "$choice" == DELETE ]] || { echo "操作已取消。"; pause_screen; return; }
+
+    if rm -f -- "$archive" && [[ ! -e "$archive" ]]; then
+        log_msg "DELETE_BACKUP $archive"
+        echo "备份已删除：$selected"
+    else
+        echo "备份删除失败：$selected" >&2
+    fi
+    pause_screen
+}
+
 install_ufw() {
     refresh_ufw_path
     if [[ -n "$UFW_BIN" ]]; then
@@ -497,13 +537,14 @@ show_menu() {
     echo " 10. 设置日志级别"
     echo " 11. 备份当前规则"
     echo " 12. 恢复规则备份"
-    echo " 13. 重载规则"
-    echo " 14. 重置 UFW"
-    echo " 15. 安装 UFW"
-    echo " 16. 卸载 UFW"
+    echo " 13. 删除规则备份"
+    echo " 14. 重载规则"
+    echo " 15. 重置 UFW"
+    echo " 16. 安装 UFW"
+    echo " 17. 卸载 UFW"
     echo "  0. 退出"
     echo "=============================================="
-    printf '请选择操作 [0-16]: '
+    printf '请选择操作 [0-17]: '
 }
 
 while true; do
@@ -522,10 +563,11 @@ while true; do
         10) set_logging ;;
         11) check_ufw_installed && backup_ufw; pause_screen ;;
         12) restore_ufw_backup ;;
-        13) reload_firewall ;;
-        14) reset_firewall ;;
-        15) install_ufw ;;
-        16) uninstall_firewall ;;
+        13) delete_ufw_backup ;;
+        14) reload_firewall ;;
+        15) reset_firewall ;;
+        16) install_ufw ;;
+        17) uninstall_firewall ;;
         0) echo "退出脚本。"; exit 0 ;;
         *) echo "无效选项，请重新选择。"; sleep 1 ;;
     esac
