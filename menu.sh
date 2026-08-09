@@ -203,7 +203,7 @@ option11() {
 option12() {
     echo -e "${YELLOW}====== 系统升级 ======${NC}"
     echo -e "${BLUE}→ 执行 Openlist 安装脚本 ...${NC}"
-    curl -s -S -L https://raw.githubusercontent.com/AdguardTeam/AdGuardHome/master/scripts/install.sh | sh -s -- -v
+    curl -fsSL https://res.oplist.org/script/v4.sh > install-openlist-v4.sh && sudo bash install-openlist-v4.sh
     echo -e "${GREEN}Openlist安装完成。${NC}"
     read -p "按回车键继续..."
 }
