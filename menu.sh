@@ -100,6 +100,7 @@ show_menu() {
     echo "21. 安装快捷命令 z（可直接输入 z 启动菜单）"
     echo "22. 解除快捷命令 z"
     echo "23. 安装基础包"
+    echo "99. 端口备忘"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
     echo -n "请输入选项 [0-23]: "
@@ -410,6 +411,26 @@ option23() {
     read -p "按回车键继续..."
 }
 
+option99() {
+    clear
+    echo -e "${YELLOW}====== 端口备忘 ======${NC}"
+    echo "53：DNS"
+    echo ""
+    echo "80：nginx"
+    echo "443：nginx"
+    echo ""
+    echo "8443：nginx"
+    echo "1553：hysteria2"
+    echo "1551：x-ui"
+    echo "1554：x-ui"
+    echo "1556：SSH"
+    echo "1552/5244：openlist"
+    echo "1555：x-uiweb"
+    echo "3000：adguard"
+    echo ""
+    read -p "按回车键继续..."
+}
+
 # 主循环
 while true; do
     show_menu
@@ -438,6 +459,7 @@ while true; do
         21) install_z_shortcut ;;
         22) remove_z_shortcut ;;
         23) option23 ;;
+        99) option99 ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         *) echo -e "${RED}无效选项，请重新输入。${NC}"; sleep 1 ;;
     esac
