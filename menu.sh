@@ -145,7 +145,7 @@ option4() {
 # 5. IP 质量检测
 option5() {
     echo -e "${YELLOW}执行：IP 质量检测...${NC}"
-    bash <(curl -s https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main/IPcheck.sh)
+    bash <(curl -Ls https://Check.Place) -I
     echo -e "${GREEN}完成。${NC}"
     read -p "按回车键继续..."
 }
