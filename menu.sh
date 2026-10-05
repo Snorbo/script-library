@@ -21,6 +21,9 @@ NC='\033[0m'
 RAW_BASE='https://raw.githubusercontent.com/Snorbo/script-library/refs/heads/main'
 BBR_URL='https://raw.githubusercontent.com/Snorbo/public/refs/heads/main/2026newconfig/bbr.sh'
 
+# 内核相关包名匹配（用于阻止 autoremove 误删内核）
+KERNEL_PKG_PATTERN='linux-image|linux-headers|linux-modules|linux-generic|linux-virtual|linux-signed|linux-restricted|linux-extra'
+
 # 自身路径：$0 在 `bash <(curl ...)` 下是 /dev/fd/63，不可直接当文件使用。
 resolve_self_path() {
     local p="${BASH_SOURCE[0]:-$0}"
@@ -205,10 +208,11 @@ show_menu() {
     echo "22. 解除快捷命令 z"
     echo "23. 安装基础包"
     echo "24. 配置ufw防火墙"
+    echo "25. 重启前引导健康检查（升级后必查）"
     echo "99. 端口备忘"
     echo "0. 退出脚本"
     echo -e "${BLUE}========================================${NC}"
-    echo -n "请输入选项 [0-24 或 99]: "
+    echo -n "请输入选项 [0-25 或 99]: "
 }
 
 # 1. 修改 SSH 端口
@@ -626,6 +630,152 @@ option14() {
     run_remote_reported '配置 nginx.conf' "${RAW_BASE}/nginxconf.sh"
 }
 
+# ---------- 系统更新辅助：防止升级后无法引导 ----------
+
+# 运行中内核对应的包名（可能为空）
+running_kernel_pkg() {
+    local rel
+    rel="$(uname -r)"
+    dpkg-query -S "/boot/vmlinuz-${rel}" 2>/dev/null | head -n1 | cut -d: -f1
+}
+
+# 把内核相关包标记为「手动安装」，避免被 autoremove 判定为孤儿而删除
+protect_kernel_packages() {
+    local -a pkgs=()
+    local p
+    p="$(running_kernel_pkg)"
+    [ -n "$p" ] && pkgs+=("$p")
+
+    # 元包 / 头文件包（存在才标记）
+    local cand
+    for cand in linux-image-generic linux-headers-generic linux-image-virtual \
+                linux-image-amd64 linux-image-arm64 linux-image-cloud-amd64; do
+        if dpkg-query -W -f='${db:Status-Abbrev}' "$cand" 2>/dev/null | grep -q '^ii'; then
+            pkgs+=("$cand")
+        fi
+    done
+
+    [ "${#pkgs[@]}" -gt 0 ] || return 0
+    # 去掉重复项后统一标记
+    printf '%s\n' "${pkgs[@]}" | sort -u | while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        if apt-mark manual "$p" >/dev/null 2>&1; then
+            echo -e "${YELLOW}  已标记为手动安装（不会被 autoremove）：${p}${NC}"
+        fi
+    done
+}
+
+# /boot 可用空间检查：空间不足时新 initramfs 会生成失败
+check_boot_space() {
+    local dir avail
+    if [ -d /boot ] && [ "$(df -P /boot 2>/dev/null | awk 'NR==2{print $6}')" = '/boot' ]; then
+        dir='/boot'
+    else
+        dir='/'
+    fi
+    avail="$(df -Pk "$dir" 2>/dev/null | awk 'NR==2{printf "%d", $4/1024}')"
+    if [ -z "$avail" ]; then
+        echo -e "${YELLOW}无法读取 ${dir} 可用空间，跳过检查。${NC}"
+        return 0
+    fi
+    echo -e "${YELLOW}${dir} 可用空间：${avail}M${NC}"
+    if [ "$avail" -lt 150 ]; then
+        echo -e "${RED}${dir} 可用空间不足 150M，升级内核可能导致 initramfs 生成失败、重启后无法引导。${NC}"
+        if ! confirm '空间偏低，仍要继续升级'; then
+            echo '已取消。请先清理旧内核：dpkg -l | grep linux-image，再手动 apt purge 不用的版本。'
+            return 1
+        fi
+    fi
+    return 0
+}
+
+# autoremove 预览：若清单里含内核相关包则拒绝执行
+safe_autoremove() {
+    if ! command -v apt-get >/dev/null 2>&1; then
+        return 0
+    fi
+    echo -e "${BLUE}→ 预览 apt autoremove 将删除的包 ...${NC}"
+    local preview
+    preview="$(DEBIAN_FRONTEND=noninteractive apt-get -s autoremove 2>/dev/null | awk '/^Remv /{print $2}')"
+
+    if [ -z "$preview" ]; then
+        echo -e "${GREEN}没有需要自动移除的包。${NC}"
+        return 0
+    fi
+
+    echo -e "${YELLOW}以下软件包将被移除：${NC}"
+    printf '  %s\n' $preview
+
+    local kernel_hits
+    kernel_hits="$(printf '%s\n' $preview | grep -E "(${KERNEL_PKG_PATTERN})" || true)"
+    if [ -n "$kernel_hits" ]; then
+        echo -e "${RED}拒绝执行 autoremove：删除清单中包含内核相关包，这会导致重启后无法引导。${NC}"
+        printf '  %s\n' $kernel_hits
+        echo -e "${YELLOW}已跳过 autoremove（不影响本次升级结果）。如确需清理，请手动执行并逐个确认：${NC}"
+        echo '  apt-get -s autoremove          # 先预览'
+        echo '  apt-get autoremove --purge <指定旧内核包>' 
+        return 1
+    fi
+
+    if ! confirm '确认移除以上软件包'; then
+        echo -e "${YELLOW}已跳过 autoremove。${NC}"
+        return 1
+    fi
+
+    if DEBIAN_FRONTEND=noninteractive apt-get autoremove -y; then
+        echo -e "${GREEN}autoremove 完成。${NC}"
+        return 0
+    fi
+    echo -e "${RED}autoremove 执行失败，请查看上方输出。${NC}"
+    return 1
+}
+
+# 升级收尾：完成半配置的包 + 重建 initramfs 与 GRUB 菜单
+finalize_upgrade() {
+    local rc=0
+
+    # 1. 完成被中断的包配置（full-upgrade 中途失败会留下半配置状态）
+    if [ -n "$(dpkg --audit 2>/dev/null | grep -v '^[[:space:]]*$' || true)" ]; then
+        echo -e "${YELLOW}检测到包状态不完整，正在完成配置（dpkg --configure -a）...${NC}"
+        DEBIAN_FRONTEND=noninteractive dpkg --configure -a || rc=1
+    fi
+    if ! DEBIAN_FRONTEND=noninteractive apt-get --fix-broken install -y >/dev/null 2>&1; then
+        echo -e "${YELLOW}apt-get --fix-broken install 未成功（可能无需修复）。${NC}"
+    fi
+
+    # 2. 重建 initramfs：确保 /boot 下每个内核都有配对的 initrd
+    if command -v update-initramfs >/dev/null 2>&1; then
+        echo -e "${BLUE}→ 重建 initramfs（update-initramfs -u -k all）...${NC}"
+        if ! update-initramfs -u -k all; then
+            echo -e "${RED}update-initramfs 失败，重启风险极高。${NC}"
+            rc=1
+        fi
+    fi
+
+    # 3. 重新生成 GRUB 菜单
+    if command -v update-grub >/dev/null 2>&1; then
+        echo -e "${BLUE}→ 更新 GRUB 引导菜单（update-grub）...${NC}"
+        if ! update-grub; then
+            echo -e "${RED}update-grub 失败，重启风险极高。${NC}"
+            rc=1
+        fi
+    fi
+
+    # 4. 自查：vmlinuz 是否都有 initrd
+    local v ver missing=0
+    for v in /boot/vmlinuz-*; do
+        [ -e "$v" ] || continue
+        ver="${v##*/vmlinuz-}"
+        if [ ! -s "/boot/initrd.img-${ver}" ]; then
+            echo -e "${RED}缺少 initramfs：/boot/initrd.img-${ver}${NC}"
+            missing=$((missing + 1))
+        fi
+    done
+    [ "$missing" -gt 0 ] && rc=1
+
+    return "$rc"
+}
+
 # 15. 配置系统更新
 option15() {
     echo -e "${YELLOW}====== 系统更新 ======${NC}"
@@ -634,16 +784,102 @@ option15() {
         pause
         return 1
     fi
-    confirm '将执行 apt update / full-upgrade / autoremove，是否继续' || { echo '已取消。'; pause; return 0; }
 
+    # 升级前后都需要的状态记录
+    local kernel_before
+    kernel_before="$(uname -r)"
+    local ts
+    ts="$(date +%Y%m%d-%H%M%S)"
+
+    echo -e "${YELLOW}当前内核：${kernel_before}${NC}"
+    confirm '将执行 apt update / full-upgrade，是否继续' || { echo '已取消。'; pause; return 0; }
+
+    # ---------- 升级前 ----------
+    echo -e "${BLUE}→ 保护内核包（标记为手动安装）...${NC}"
+    protect_kernel_packages
+
+    if ! check_boot_space; then
+        pause
+        return 1
+    fi
+
+    # 备份关键引导配置
+    local bak_dir="/var/backups/pre-upgrade-${ts}"
+    mkdir -p "$bak_dir" 2>/dev/null || true
+    cp -a /etc/fstab "${bak_dir}/fstab" 2>/dev/null || true
+    [ -f /boot/grub/grub.cfg ] && cp -a /boot/grub/grub.cfg "${bak_dir}/grub.cfg" 2>/dev/null
+    echo -e "${BLUE}→ 已备份 /etc/fstab 与 GRUB 配置到 ${bak_dir}${NC}"
+
+    # ---------- 执行升级 ----------
     echo -e "${BLUE}→ apt update ...${NC}"
-    apt-get update || { echo -e "${RED}apt update 失败。${NC}"; pause; return 1; }
+    if ! apt-get update; then
+        echo -e "${RED}apt update 失败，已中止（未做任何修改）。${NC}"
+        pause
+        return 1
+    fi
+
     echo -e "${BLUE}→ apt full-upgrade -y ...${NC}"
-    DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y || { echo -e "${RED}升级过程出错，请查看上方输出。${NC}"; pause; return 1; }
-    echo -e "${BLUE}→ apt autoremove -y ...${NC}"
-    DEBIAN_FRONTEND=noninteractive apt-get autoremove -y
-    echo -e "${GREEN}系统更新完成。如内核有更新，建议稍后重启。${NC}"
+    if ! DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y; then
+        echo -e "${RED}full-upgrade 未能正常完成，包状态可能不完整。${NC}"
+        echo -e "${YELLOW}正在尝试完成配置与修复依赖（不要在此状态下重启）...${NC}"
+        finalize_upgrade || true
+        echo
+        echo -e "${RED}结果无法确认，运行引导健康检查以给出结论：${NC}"
+        run_remote "${RAW_BASE}/bootcheck.sh" || true
+        echo -e "${RED}★ 在引导检查通过之前，请不要重启系统。${NC}"
+        pause
+        return 1
+    fi
+
+    # ---------- autoremove（带内核保护）----------
+    safe_autoremove || true
+
+    # ---------- 升级后校验 ----------
+    echo -e "${BLUE}→ 升级后校验（initramfs / GRUB / 内核配对）...${NC}"
+    local final_ok='yes'
+    finalize_upgrade || final_ok='no'
+
+    local kernel_after
+    kernel_after="$(uname -r)"
+
+    echo
+    if [ "$kernel_after" != "$kernel_before" ]; then
+        echo -e "${YELLOW}注意：运行中内核已是 ${kernel_after}（升级前为 ${kernel_before}）。${NC}"
+    fi
+    echo -e "${YELLOW}已安装的内核：${NC}"
+    dpkg-query -W -f='  ${binary:Package}  ${Version}\n' 'linux-image-*' 2>/dev/null | grep -v '^  linux-image-[0-9]' | head -n 5
+    dpkg-query -W -f='  ${binary:Package}\n' 'linux-image-[0-9]*' 2>/dev/null | head -n 10
+
+    echo
+    if [ "$final_ok" != 'yes' ]; then
+        echo -e "${RED}★ 校验未通过：initramfs 或 GRUB 存在问题，请勿重启。${NC}"
+        echo -e "${YELLOW}请先执行：bash <(curl -fsSL ${RAW_BASE}/bootcheck.sh) --fix${NC}"
+    else
+        echo -e "${GREEN}系统更新完成，引导相关校验通过。${NC}"
+        if [ -e /var/run/reboot-required ] || [ -e /run/reboot-required ]; then
+            echo -e "${YELLOW}系统标记需要重启以完成更新。重启前建议先运行一次引导检查：${NC}"
+            echo -e "${YELLOW}  bash <(curl -fsSL ${RAW_BASE}/bootcheck.sh)${NC}"
+            if confirm '现在重启以完成更新（建议先用 VNC 确认可登录）'; then
+                echo -e "${YELLOW}将在 30 秒后重启，可用 Ctrl+C 取消...${NC}"
+                if command -v shutdown >/dev/null 2>&1; then
+                    shutdown -r +0.5 'menu.sh: 系统更新完成后的计划重启' || reboot
+                else
+                    reboot
+                fi
+            else
+                echo -e "${YELLOW}已跳过重启，请在方便时执行：reboot${NC}"
+            fi
+        else
+            echo -e "${GREEN}无需重启。${NC}"
+        fi
+    fi
     pause
+}
+
+# 25. 重启前引导健康检查
+option25() {
+    echo -e "${YELLOW}执行：重启前引导健康检查...${NC}"
+    run_remote_reported '引导健康检查' "${RAW_BASE}/bootcheck.sh"
 }
 
 # 16. Ubuntu 系统升级
@@ -879,6 +1115,7 @@ while true; do
         22) remove_z_shortcut ;;
         23) option23 ;;
         24) option24 ;;
+        25) option25 ;;
         99) option99 ;;
         0) echo -e "${GREEN}退出脚本。${NC}"; exit 0 ;;
         '') ;; # 空输入（直接回车）：静默重绘

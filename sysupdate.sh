@@ -93,23 +93,149 @@ kernel_update_pending() {
     [ -n "$newest" ] && [ "$newest" != "$running" ]
 }
 
+KERNEL_PKG_PATTERN='linux-image|linux-headers|linux-modules|linux-generic|linux-virtual|linux-signed|linux-restricted|linux-extra'
+
+# ---------- 引导安全：内核保护 / 空间检查 / autoremove 预览 / 收尾校验 ----------
+
+running_kernel_pkg() {
+    dpkg-query -S "/boot/vmlinuz-$(uname -r)" 2>/dev/null | head -n1 | cut -d: -f1
+}
+
+protect_kernel_packages() {
+    local -a pkgs=()
+    local p cand
+    p="$(running_kernel_pkg)"
+    [ -n "$p" ] && pkgs+=("$p")
+    for cand in linux-image-generic linux-headers-generic linux-image-virtual \
+                linux-image-amd64 linux-image-arm64 linux-image-cloud-amd64; do
+        if dpkg-query -W -f='${db:Status-Abbrev}' "$cand" 2>/dev/null | grep -q '^ii'; then
+            pkgs+=("$cand")
+        fi
+    done
+    [ "${#pkgs[@]}" -gt 0 ] || return 0
+    printf '%s\n' "${pkgs[@]}" | sort -u | while IFS= read -r p; do
+        [ -n "$p" ] || continue
+        apt-mark manual "$p" >/dev/null 2>&1 && info "  内核包已标记为手动安装：${p}"
+    done
+}
+
+check_boot_space() {
+    local dir avail
+    if [ -d /boot ] && [ "$(df -P /boot 2>/dev/null | awk 'NR==2{print $6}')" = '/boot' ]; then
+        dir='/boot'
+    else
+        dir='/'
+    fi
+    avail="$(df -Pk "$dir" 2>/dev/null | awk 'NR==2{printf "%d", $4/1024}')"
+    [ -n "$avail" ] || return 0
+    info "${dir} 可用空间：${avail}M"
+    if [ "$avail" -lt 150 ]; then
+        err "${dir} 可用空间不足 150M，升级内核可能导致 initramfs 生成失败、重启后无法引导。"
+        err '请先清理旧内核后再执行更新。'
+        return 1
+    fi
+    return 0
+}
+
+safe_autoremove() {
+    info '→ 预览 apt-get autoremove'
+    local preview
+    preview="$(DEBIAN_FRONTEND=noninteractive apt-get -s autoremove 2>/dev/null | awk '/^Remv /{print $2}')"
+    if [ -z "$preview" ]; then
+        ok '没有需要自动移除的包。'
+        return 0
+    fi
+    warn '以下软件包将被移除：'
+    printf '  %s\n' $preview
+
+    local kernel_hits
+    kernel_hits="$(printf '%s\n' $preview | grep -E "(${KERNEL_PKG_PATTERN})" || true)"
+    if [ -n "$kernel_hits" ]; then
+        err '拒绝执行 autoremove：清单中包含内核相关包，会导致重启后无法引导。'
+        printf '  %s\n' $kernel_hits
+        warn '已跳过 autoremove。如确需清理请手动指定旧内核包并逐个确认。'
+        return 1
+    fi
+
+    if [ "$ASSUME_YES" != 'yes' ] && [ -t 0 ]; then
+        read -r -p '确认移除以上软件包？(y/N): ' a || a='n'
+        if [[ ! "$a" =~ ^[Yy]$ ]]; then
+            warn '已跳过 autoremove。'
+            return 1
+        fi
+    fi
+
+    DEBIAN_FRONTEND=noninteractive apt-get autoremove -y && ok 'autoremove 完成。' || warn 'autoremove 返回非零。'
+}
+
+finalize_upgrade() {
+    local rc=0
+
+    if [ -n "$(dpkg --audit 2>/dev/null | grep -v '^[[:space:]]*$' || true)" ]; then
+        warn '检测到包状态不完整，正在完成配置（dpkg --configure -a）...'
+        DEBIAN_FRONTEND=noninteractive dpkg --configure -a || rc=1
+    fi
+    DEBIAN_FRONTEND=noninteractive apt-get --fix-broken install -y >/dev/null 2>&1 || true
+
+    if command -v update-initramfs >/dev/null 2>&1; then
+        info '→ 重建 initramfs（update-initramfs -u -k all）'
+        update-initramfs -u -k all || { err 'update-initramfs 失败，重启风险极高。'; rc=1; }
+    fi
+    if command -v update-grub >/dev/null 2>&1; then
+        info '→ 更新 GRUB 菜单（update-grub）'
+        update-grub || { err 'update-grub 失败，重启风险极高。'; rc=1; }
+    fi
+
+    local v ver missing=0
+    for v in /boot/vmlinuz-*; do
+        [ -e "$v" ] || continue
+        ver="${v##*/vmlinuz-}"
+        if [ ! -s "/boot/initrd.img-${ver}" ]; then
+            err "缺少 initramfs：/boot/initrd.img-${ver}"
+            missing=$((missing + 1))
+        fi
+    done
+    [ "$missing" -gt 0 ] && rc=1
+    return "$rc"
+}
+
 linux_update() {
     info '正在系统更新...'
 
     if command -v apt-get >/dev/null 2>&1; then
         fix_dpkg || { err 'apt/dpkg 未处于空闲状态，已中止。'; return 1; }
+
+        # 升级前：保护内核 + 检查 /boot 空间 + 备份引导配置
+        protect_kernel_packages
+        check_boot_space || return 1
+        local bak_dir="/var/backups/pre-upgrade-$(date +%Y%m%d-%H%M%S)"
+        mkdir -p "$bak_dir" 2>/dev/null || true
+        cp -a /etc/fstab "${bak_dir}/fstab" 2>/dev/null || true
+        [ -f /boot/grub/grub.cfg ] && cp -a /boot/grub/grub.cfg "${bak_dir}/grub.cfg" 2>/dev/null
+        info "已备份 /etc/fstab 与 GRUB 配置到 ${bak_dir}"
+
         info '→ apt-get update'
         if ! DEBIAN_FRONTEND=noninteractive apt-get update; then
             err 'apt-get update 失败，已中止（请检查软件源/网络）。'
             return 1
         fi
+
         info '→ apt-get full-upgrade -y'
         if ! DEBIAN_FRONTEND=noninteractive apt-get full-upgrade -y; then
-            err 'apt-get full-upgrade 失败，请查看上方输出。'
+            err 'apt-get full-upgrade 失败，包状态可能不完整。'
+            warn '正在尝试完成配置与修复依赖（不要在此状态下重启）...'
+            finalize_upgrade || warn '收尾校验未通过，请勿重启，先执行：bash bootcheck.sh --fix'
             return 1
         fi
-        info '→ apt-get autoremove -y'
-        DEBIAN_FRONTEND=noninteractive apt-get autoremove -y || warn 'autoremove 返回非零（可忽略）。'
+
+        safe_autoremove || true
+
+        info '→ 升级后校验（initramfs / GRUB / 内核配对）'
+        if ! finalize_upgrade; then
+            err '★ 校验未通过：initramfs 或 GRUB 存在问题，请勿重启。'
+            err '请先执行：bash bootcheck.sh --fix'
+            return 1
+        fi
 
     elif command -v dnf >/dev/null 2>&1; then
         dnf -y upgrade || { err 'dnf upgrade 失败。'; return 1; }
