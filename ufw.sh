@@ -1,7 +1,15 @@
 #!/usr/bin/env bash
 
-# UFW 管理脚本（Ubuntu 优先）
+# UFW 管理脚本（Debian/Ubuntu 优先）
 # 说明：脚本需要 root 权限，请使用 sudo 执行。
+#
+# 本脚本对原版的修正：
+#   1. 明确说明 umask 077 会在本进程内持续生效（仅影响本脚本创建的文件），
+#      因此备份文件权限为 0600、备份目录为 0700，属于有意为之
+#   2. 恢复备份时不再使用 --no-same-permissions（会让 /etc/ufw 内文件
+#      权限退化为 umask 默认值），改为恢复后显式修正属主与权限
+#   3. install_ufw 的 apt-get 分支补充结果检查与提示
+#   4. 其它逻辑（输入校验、锁、备份、确认词）保持原样
 
 set -o pipefail
 umask 077
@@ -141,7 +149,16 @@ restore_ufw_backup() {
     read -r -p "恢复前会先备份当前配置，确认恢复？请输入 RESTORE：" choice
     [[ "$choice" == RESTORE ]] || { echo "操作已取消。"; pause_screen; return; }
     backup_ufw || { pause_screen; return; }
-    if tar -xzf "$archive" -C /etc --no-same-owner --no-same-permissions && ufw_change reload; then
+    # 不用 --no-same-permissions：否则 ufw 自身要求的权限位会被 umask 077 改写
+    if tar -xzf "$archive" -C /etc --no-same-owner && ufw_change reload; then
+        # 修正属主与权限（ufw 要求 /etc/ufw 内文件属 root，且脚本需可执行）
+        chown -R root:root /etc/ufw 2>/dev/null || true
+        chmod 755 /etc/ufw 2>/dev/null || true
+        find /etc/ufw -maxdepth 1 -type d -exec chmod 755 {} + 2>/dev/null || true
+        find /etc/ufw -maxdepth 1 -type f -name '*.rules' -exec chmod 640 {} + 2>/dev/null || true
+        find /etc/ufw -maxdepth 1 -type f -name '*.conf' -exec chmod 640 {} + 2>/dev/null || true
+        find /etc/ufw -maxdepth 2 -type f -name '*.init' -exec chmod 755 {} + 2>/dev/null || true
+        find /etc/ufw -maxdepth 2 -type f -name '*.rules' -path '*/before*' -exec chmod 640 {} + 2>/dev/null || true
         log_msg "RESTORE $archive"
         echo "备份已恢复，UFW 规则已重载。"
     else
@@ -203,7 +220,12 @@ install_ufw() {
     echo "检测到包管理器：$package_manager"
     case "$package_manager" in
         apt)
-            apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y ufw
+            if ! apt-get update; then
+                echo "警告：apt-get update 失败，仍尝试安装。" >&2
+            fi
+            if ! DEBIAN_FRONTEND=noninteractive apt-get install -y ufw; then
+                echo "ufw 安装命令返回非零，请查看上方 apt 输出。" >&2
+            fi
             ;;
         dnf)
             dnf install -y ufw
